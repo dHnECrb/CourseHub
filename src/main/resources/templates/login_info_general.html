@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="zh-cn">
+<head>
+    <meta charset="UTF-8">
+    <title th:text="${title}"></title>
+    <link rel="icon" th:href="@{/favicon.ico}" type="image/x-icon">
+    <link th:href="@{/style.css}" rel="stylesheet" type="text/css">
+</head>
+<body>
+    <div class="main-div">
+        <div id="login-div">
+            <h1 th:text="${h1_text}"></h1>
+            <p th:text="${reason}" id="msg"></p>
+            <p>&nbsp;</p>
+            <a th:href="${button_event}" id="login-a" th:text="${button_text}"></a>
+
+        </div>
+    </div>
+</body>
+</html>

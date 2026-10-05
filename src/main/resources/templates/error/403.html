@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>权限错误</title>
+    <link rel="icon" th:href="@{/favicon.ico}" type="image/x-icon">
+    <link th:href="@{/style.css}" rel="stylesheet" type="text/css">
+</head>
+<body>
+    <div class="main-div">
+        <div id="login-div">
+            <h1 th:text="${status}"></h1>
+            <p th:text="${message}"></p>
+            <button id="login-button" onclick="history.back()">返&nbsp;&nbsp;回</button>
+        </div>
+    </div>
+</body>
+</html>

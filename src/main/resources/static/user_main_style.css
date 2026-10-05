@@ -1,0 +1,100 @@
+*{
+    margin:0;
+    padding:0;
+}
+body{
+    margin:0;
+    padding:0;
+    text-align: center;
+    width:100%;
+}
+
+#header{
+    height: 50px;
+    width:100%;
+    background-color: blue;
+    color:white;
+    font-size: 30px;
+}
+
+#header p{
+    margin: 0;
+}
+
+#header-left{
+    display: inline-flex;
+    position:relative;
+    float:left;
+}
+
+#header-right{
+    display:inline-flex;
+    position: relative;
+    float:right;
+    height: 100%;
+}
+
+#logout-button{
+    margin:7px 0;
+    padding: 0 25px;
+    background-color: blue;
+    color:white;
+}
+
+#logout-button:hover{
+    background-color: blueviolet;
+    cursor:pointer;
+}
+
+#main-div{
+    margin:0;
+    padding:0;
+    /*align-content:center;*/
+    /*display: flex;*/
+    justify-content: center; /* 水平居中 */
+    align-items: center;     /* 垂直居中 */
+}
+
+#main-div table{
+    border: black 2px solid;
+    border-collapse: collapse;
+    display: inline-block;
+    /*justify-content: center;*/
+}
+
+th, td {
+    border: 1px solid black;
+    padding:10px;
+}
+
+td a{
+    margin :20px 0 10px 0;
+    padding: 6px 40px;
+    background-color: #4CAF50;
+    color:black;
+    /*font-size: 32px;*/
+    cursor: pointer;
+    font-family: 'SimHei', sans-serif;
+    text-decoration: none;
+}
+
+td a:hover{
+    background-color: blueviolet;
+    color: white;
+}
+
+#option{
+    display: block;
+}
+
+#option button{
+    background-color: #4CAF50;
+    cursor: pointer;
+    font-size: 16px;
+    padding: 2px 15px;
+}
+
+#option button:hover{
+    background-color: blueviolet;
+    color: white;
+}

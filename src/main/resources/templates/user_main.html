@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="zh-cn">
+<head>
+    <meta charset="UTF-8">
+    <title>用户主页</title>
+    <link rel="icon" th:href="@{/favicon.ico}" type="image/x-icon">
+    <link th:href="@{/user_main_style.css}" rel="stylesheet" type="text/css">
+</head>
+<body>
+
+
+    <!-- 遮罩层 + 警告弹窗 -->
+    <div id="idle-mask" style="display:none;">
+        <div id="idle-dialog" role="alertdialog" aria-modal="true">
+            <div id="idle-title">会话即将过期</div>
+            <div id="idle-message">
+                检测到您长时间未操作，<span id="idle-countdown">30</span> 秒后将自动退出登录。
+            </div>
+            <div id="idle-buttons">
+                <button id="idle-stay" class="btn btn-primary">继续会话</button>
+                <button id="idle-logout" class="btn btn-secondary">退出登录</button>
+            </div>
+        </div>
+    </div>
+
+
+    <div id="header">
+        <div id="header-left">
+            主界面
+        </div>
+        <div id="header-right">
+            <p th:text="${userId}"></p>
+            <button type="button" onClick="window.location.href='/app_1/main/logout'" id="logout-button">注销</button>
+
+        </div>
+    </div>
+    <div id="main-div">
+        <div id="option">
+            <input type="checkbox" id="filter-time" checked>
+            <label for="filter-time">筛选在时间范围内的任务</label>
+            <button onclick="refreshTaskTable()">刷新任务</button>
+        </div>
+        <table>
+            <thead>
+            <tr>
+                <th>序号</th>
+                <th>名称</th>
+                <th>详细信息</th>
+                <th>开始时间</th>
+                <th>结束时间</th>
+                <th>地址</th>
+            </tr>
+            </thead>
+
+            <tbody id="task-body">
+<!--            <tr th:each="task,stat : ${tasks}">-->
+<!--                <td th:text="${stat.count}"></td>-->
+<!--                <td th:text="${task.name}"></td>-->
+<!--                <td th:text="${task.comment}"></td>-->
+<!--                <td th:text="${task.start_time}"></td>-->
+<!--                <td th:text="${task.deadline_time}"></td>-->
+<!--                <td><a th:href="|/app_1${task.site}|" th:text="${task.name}"></a></td>-->
+<!--            </tr>-->
+            </tbody>
+        </table>
+    </div>
+
+    <script th:src="@{/heartbeat.js}"></script>
+    <script>
+        function refreshTaskTable() {
+            let filterTime = document.getElementById('filter-time').checked;
+
+            // 2. 发请求给后端接口（GET 示例）
+            fetch('/app_1/main/tasks?filterTime=' + filterTime)
+                .then(resp => resp.json())
+                .then(tasks => {
+                    // 3. 清空旧数据，重新渲染
+                    const tbody = document.getElementById('task-body');
+                    tbody.innerHTML = '';
+
+                    tasks.forEach((task, index) => {
+                        const tr = document.createElement('tr');
+                        tr.innerHTML =
+                            `<td>${index + 1}</td>` +
+                            `<td>${task.name}</td>` +
+                            `<td>${task.comment}</td>` +
+                            `<td>${task.start_time}</td>` +
+                            `<td>${task.deadline_time}</td>` +
+                            `<td><a href="/app_1${task.site}">进入 ${task.name}</a></td>`;
+                        tbody.appendChild(tr);
+                    });
+                })
+                .catch(err => {
+                    console.error("任务请求失败：", err);
+                    alert('请求失败');
+                });
+        }
+        refreshTaskTable();
+    </script>
+</body>
+</html>

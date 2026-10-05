@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.example.springdemo.mapper.CourseMapper">
+
+<!--    <select id="findAll" resultType="com.example.springdemo.entity.Course">-->
+<!--        SELECT * FROM course-->
+<!--    </select>-->
+
+    <select id="findByTerm" resultType="com.example.springdemo.entity.Course" parameterType="String">
+        SELECT * FROM course WHERE term = #{term}
+    </select>
+
+</mapper>

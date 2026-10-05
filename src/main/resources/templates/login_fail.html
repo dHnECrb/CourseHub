@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="zh-cn">
+<head>
+    <meta charset="UTF-8">
+    <title>登录失败</title>
+    <link rel="icon" th:href="@{/favicon.ico}" type="image/x-icon">
+    <link th:href="@{/style.css}" rel="stylesheet" type="text/css">
+
+</head>
+<body>
+    <div class="main-div">
+        <div id="login-div">
+            <h1>登录失败！</h1>
+            <p th:text="${reason}" id="msg"></p>
+            <button type="button" onclick="history.back()" id="login-button">返&nbsp;&nbsp;&nbsp;&nbsp;回</button>
+        </div>
+    </div>
+</body>
+</html>

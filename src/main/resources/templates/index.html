@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="zh-cn">
+<head>
+    <meta charset="UTF-8">
+    <title>登录</title>
+    <link rel="icon" th:href="@{/favicon.ico}" type="image/x-icon">
+    <link th:href="@{/style.css}" rel="stylesheet" type="text/css">
+    <script th:src="@{/script1.js}"></script>
+</head>
+<body>
+    <div class="main-div">
+        <div id="login-div">
+            <h1>登录界面</h1>
+            <form id="login-form" action="/app_1/login" method="post">
+                账号：<input type="text" name="id" id="id" autocomplete="username" placeholder="在这里输入账号" th:value="${userId}"><br>
+                密码：<input type="password" name="password" id="password" autocomplete="current-password" placeholder="在这里输入密码"><br>
+            </form>
+            <button type="button" onclick="login()" id="login-button">登&nbsp;&nbsp;&nbsp;&nbsp;录</button>
+            <p th:text="${msg}" id="msg"></p>
+        </div>
+    </div>
+</body>
+</html>

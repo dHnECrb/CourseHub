@@ -1,0 +1,71 @@
+/* 遮罩层：覆盖整个视口，半透明黑色实现变暗 */
+#idle-mask {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.55);   /* 数值越小越暗，0.4~0.7 常用 */
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* 弹窗本体 */
+#idle-dialog {
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    padding: 24px 28px;
+    width: 360px;
+    max-width: 90vw;
+    text-align: center;
+}
+
+#idle-title {
+    font-size: 18px;
+    font-weight: 600;
+    margin-bottom: 12px;
+    color: #d4380d;           /* 警示色 */
+}
+
+#idle-message {
+    font-size: 14px;
+    color: #555;
+    margin-bottom: 20px;
+    line-height: 1.6;
+}
+
+#idle-countdown {
+    font-size: 20px;
+    font-weight: 700;
+    color: #d4380d;
+}
+
+#idle-buttons {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+}
+
+.btn {
+    padding: 8px 20px;
+    border: none;
+    border-radius: 4px;
+    font-size: 14px;
+    cursor: pointer;
+}
+
+.btn-primary {
+    background: #1890ff;
+    color: #fff;
+}
+.btn-primary:hover { background: #40a9ff; }
+
+.btn-secondary {
+    background: #f5f5f5;
+    color: #666;
+    border: 1px solid #ddd;
+}
+.btn-secondary:hover { background: #e8e8e8; }

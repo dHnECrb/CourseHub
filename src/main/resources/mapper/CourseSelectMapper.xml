@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.example.springdemo.mapper.CourseSelectMapper">
+
+<!--    <insert id="newCourseSelect" parameterType="com.example.springdemo.entity.CourseSelect">-->
+<!--        INSERT INTO select_course(user_id, course_id, select_time) VALUES(#{user_id}, #{course_id}, #{select_time})-->
+<!--    </insert>-->
+
+<!--    <delete id="delete" parameterType="com.example.springdemo.entity.CourseSelect">-->
+<!--        DELETE FROM select_course WHERE user_id=#{user_id} AND course_id=#{course_id}-->
+<!--    </delete>-->
+
+<!--    <select id="getAll" resultType="com.example.springdemo.entity.CourseSelect">-->
+<!--        SELECT * FROM select_course-->
+<!--    </select>-->
+
+<!--    <select id="findByCourse" resultType="com.example.springdemo.entity.CourseSelect" parameterType="com.example.springdemo.entity.Course">-->
+<!--        SELECT * FROM select_course WHERE course_id=#{id}-->
+<!--    </select>-->
+
+<!--    <select id="findByUser" resultType="com.example.springdemo.entity.CourseSelect" parameterType="com.example.springdemo.entity.User">-->
+<!--        SELECT * FROM select_course WHERE user_id=#{id}-->
+<!--    </select>-->
+
+</mapper>

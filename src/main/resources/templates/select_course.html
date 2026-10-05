@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>预选课</title>
+    <link rel="icon" th:href="@{/favicon.ico}" type="image/x-icon">
+    <link th:href="@{/style.css}" rel="stylesheet" type="text/css">
+    <link th:href="@{/select_course_style.css}" rel="stylesheet" type="text/css">
+    <link th:href="@{/idle_mask.css}" rel="stylesheet" type="text/css">
+</head>
+<body>
+    <!--会话过期的遮罩-->
+    <div id="idle-mask" style="display:none;">
+        <div id="idle-dialog" role="alertdialog" aria-modal="true">
+            <div id="idle-title">会话即将过期</div>
+            <div id="idle-message">
+                检测到您长时间未操作，<span id="idle-countdown">30</span> 秒后将自动退出登录。
+            </div>
+            <div id="idle-buttons">
+                <button id="idle-stay" class="btn btn-primary">继续会话</button>
+                <button id="idle-logout" class="btn btn-secondary">退出登录</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="fixed-box">
+        <div class="progress-container"> <!--专业选修课-->
+            <div class="progress-bar"></div>
+        </div>
+
+        <div class="progress-container"> <!--实践选修课-->
+            <div class="progress-bar"></div>
+        </div>
+
+    </div>
+
+
+
+    <script th:src="@{/heartbeat.js}"></script>
+</body>
+</html>
