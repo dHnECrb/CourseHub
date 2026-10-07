@@ -1,6 +1,8 @@
 package com.example.springdemo;
 
 import com.baomidou.mybatisplus.core.toolkit.Assert;
+import com.example.springdemo.dto.SelectedCourseView;
+import com.example.springdemo.dto.SelectingCourseView;
 import com.example.springdemo.entity.*;
 import com.example.springdemo.mapper.*;
 import jakarta.annotation.Resource;
@@ -132,6 +134,60 @@ class MapperTests { // 原名：SpringDemoApplicationTests
             System.out.println("==============删除了一个=================");
             userTasks.forEach(System.out::println);
         }
+    }
+
+    @Test
+    public void testSelectSelectedCourses(){
+        // 与 testCourseSelect 类似的准备逻辑：没有选课数据时先造几条
+        if(courseSelectMapper.selectList(null).isEmpty()) {
+            courseSelectMapper.insert(new CourseSelect(1L, 2L, LocalDateTime.now(), YearTerm.now().toString()));
+            courseSelectMapper.insert(new CourseSelect(1L, 3L, LocalDateTime.now(), YearTerm.now().toString()));
+            courseSelectMapper.insert(new CourseSelect(1L, 4L, LocalDateTime.now(), YearTerm.now().toString()));
+        }
+
+        String currentTerm = YearTerm.now().toString();
+        System.out.println("==============当前学期：" + currentTerm + "=================");
+
+        for (Long userId = 1L; userId <= 4L; userId++) {
+            List<SelectedCourseView> views = courseSelectMapper.selectSelectedCourses(userId, currentTerm);
+            System.out.println("==============" + userId + "号学生选的课程：=================");
+            views.forEach(System.out::println);
+        }
+    }
+
+    @Test
+    public void testSelectCoursesToSelect(){
+        String nextTerm = YearTerm.now().next().toString();
+        System.out.println("==============下一学期：" + nextTerm + "=================");
+
+        // 准备逻辑：下一学期还没有课程时先造几条（含一门可能不开课的）
+        Map<String, Object> termMap=new HashMap<>();
+        termMap.put("term", nextTerm);
+        if(courseMapper.selectByMap(termMap).size()<=3) {
+            courseMapper.insert(new Course(11L, "编译原理", nextTerm, "专业必修课", true, 4));
+            courseMapper.insert(new Course(12L, "操作系统", nextTerm, "专业必修课", true, 4));
+            courseMapper.insert(new Course(13L, "机器学习", nextTerm, "专业选修课", false, 3));
+        }
+
+        // 取下一学期的一门课，让1号学生选它（重复执行测试时避免冲突，先删再插）
+        List<Course> nextTermCourses = courseMapper.selectByMap(termMap);
+        Long courseId = nextTermCourses.get(0).getId();
+        Map<String, Object> deleteMap=new HashMap<>();
+        deleteMap.put("user_id", 1L);
+        deleteMap.put("course_id", courseId);
+        courseSelectMapper.deleteByMap(deleteMap);
+        courseSelectMapper.insert(new CourseSelect(1L, courseId, LocalDateTime.now(), YearTerm.now().toString()));
+
+        System.out.println("==============不筛选是否开课=================");
+        for (Long userId = 1L; userId <= 2L; userId++) {
+            List<SelectingCourseView> views = courseSelectMapper.selectCoursesToSelect(userId, nextTerm, false);
+            System.out.println("==============" + userId + "号学生看到的待选课程：=================");
+            views.forEach(System.out::println);
+        }
+
+        System.out.println("==============只显示确定开课的=================");
+        List<SelectingCourseView> views = courseSelectMapper.selectCoursesToSelect(1L, nextTerm, true);
+        views.forEach(System.out::println);
     }
 
     @Test

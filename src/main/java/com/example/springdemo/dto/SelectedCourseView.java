@@ -1,9 +1,11 @@
 package com.example.springdemo.dto;
 
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 /**用于在前端展示已修和正在修读的课程*/
 @Data
+@NoArgsConstructor
 public class SelectedCourseView {
     private Long    courseId;   // 课程编号
     private String  courseName; // 课程名称

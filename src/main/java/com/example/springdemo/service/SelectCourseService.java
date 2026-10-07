@@ -2,12 +2,16 @@ package com.example.springdemo.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.example.springdemo.dto.RequestResult;
+import com.example.springdemo.dto.SelectedCourseView;
+import com.example.springdemo.dto.SelectingCourseView;
 import com.example.springdemo.entity.Course;
 import com.example.springdemo.entity.CourseSelect;
 import com.example.springdemo.entity.YearTerm;
 import com.example.springdemo.mapper.CourseMapper;
 import com.example.springdemo.mapper.CourseSelectMapper;
 import jakarta.annotation.Resource;
+import jakarta.servlet.annotation.HandlesTypes;
+import jakarta.servlet.annotation.HttpConstraint;
 import jakarta.servlet.http.HttpSession;
 import org.jspecify.annotations.NonNull;
 import org.springframework.context.MessageSource;
@@ -69,23 +73,46 @@ public class SelectCourseService {
         return courseMapper.selectList(wrapper);
     }
 
-    /**批量更新选课
-     * @param courseIdList 课程号列表
-     * @param insertOrDelete 新选课(true)还是删除选课(false)*/
-    public void ChangeSelectCourses(@NonNull HttpSession httpSession, List<Long> courseIdList, boolean insertOrDelete){
+//    /**批量更新选课
+//     * @param courseIdList 课程号列表
+//     * @param insertOrDelete 新选课(true)还是删除选课(false)*/
+//    public void ChangeSelectCourses(@NonNull HttpSession httpSession, List<Long> courseIdList, boolean insertOrDelete){
+//        Long userId=Long.parseLong((String)httpSession.getAttribute("userId"));
+//        if(!hasPermission(httpSession)){
+//            return ;
+//        }
+//        if(insertOrDelete){
+//            for(Long courseId:courseIdList) {
+//                courseSelectMapper.insert(new CourseSelect(userId, courseId, LocalDateTime.now(), YearTerm.now().toString()));
+//            }
+//        }
+//        else{
+//            courseSelectMapper.deleteByIds(courseIdList);
+//        }
+//    }
+
+    /**查询当前学生选的所有课程及其修读状态
+     * @param httpSession 当前http会话
+     * @return 已选课程视图列表（含修读状态），无权限时返回空列表*/
+    public List<SelectedCourseView> getSelectedCourses(@NonNull HttpSession httpSession){
         Long userId=Long.parseLong((String)httpSession.getAttribute("userId"));
         if(!hasPermission(httpSession)){
-            return ;
+            return List.of();
         }
-        if(insertOrDelete){
-            for(Long courseId:courseIdList) {
-                courseSelectMapper.insert(new CourseSelect(userId, courseId, LocalDateTime.now(), YearTerm.now().toString()));
-            }
-        }
-        else{
-            courseSelectMapper.deleteByIds(courseIdList);
-        }
+        return courseSelectMapper.selectSelectedCourses(userId, YearTerm.now().toString());
     }
 
-//    public List<>
+    /**查询当前学生所有可选的课程以及选择情况
+     * @param httpSession 当前http会话
+     * @param filterWillOffer 是否筛选可能不开课的课程
+     * @return 下一学期可选课程视图列表，无权限时返回空列表*/
+    public List<SelectingCourseView> getCoursesToSelect(@NonNull HttpSession httpSession, boolean filterWillOffer){
+        Long userId=Long.parseLong((String)httpSession.getAttribute("userId"));
+        if(!hasPermission(httpSession)){
+            return List.of();
+        }
+        return courseSelectMapper.selectCoursesToSelect(userId, YearTerm.now().next().toString(), filterWillOffer);
+    }
+
+
 }

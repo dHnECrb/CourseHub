@@ -42,24 +42,22 @@ body{
 }
 .bar-row{
     display:grid;
-    grid-template-columns:92px 1fr 72px;
+    grid-template-columns:118px 1fr 72px;
     align-items:center;
     gap:10px;
     margin:10px 0 20px;
 }
 .bar-label{
-    position:relative;
+    display:flex;
+    align-items:center;
+    gap:4px;
     font-size:15px;
     color:#111827;
     white-space:nowrap;
 }
 .warn-icon{
-    position:absolute;
-    left:-28px;
-    top:50%;
-    transform:translateY(-50%);
-    font-size:22px;
-    filter:drop-shadow(0 1px 1px rgba(0,0,0,.25));
+    font-size:17px;
+    flex:none;
 }
 .progress-track{
     position:relative;
@@ -69,16 +67,67 @@ body{
     overflow:hidden;
 }
 .seg{
-    height:100%;
-    float:left;
+    position:absolute;
+    top:0;
+    bottom:0;
     border-right:1px solid rgba(0,0,0,.75);
 }
+.seg-label-row{position:relative;height:20px;margin-bottom:2px}
+.seg-label{
+    position:absolute;
+    top:0;
+    height:100%;
+    text-align:center;
+    font-size:13px;
+    white-space:nowrap;
+    overflow:visible;
+    color:#111827;
+}
+.bar-area{min-width:0}
+.filter-row{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    padding:10px 18px;
+    border-bottom:1px solid var(--line);
+    background:#f8fafc;
+}
+.filter-row button{
+    margin-left:18px;
+    padding:6px 26px;
+    font-size:14px;
+    border:1px solid #64748b;
+    border-radius:8px;
+    background:#fff;
+    cursor:pointer;
+}
+.filter-row button:hover{background:#f1f5f9}
+.submit-row{display:flex;justify-content:center;margin:26px 0}
+.submit-row button{
+    padding:12px 52px;
+    font-size:17px;
+    border:1px solid #64748b;
+    border-radius:8px;
+    background:#fff;
+    cursor:pointer;
+}
+.submit-row button:hover{background:#f1f5f9}
+.card-title button{
+    padding:5px 18px;
+    font-size:13px;
+    font-weight:400;
+    border:1px solid var(--line);
+    border-radius:6px;
+    background:#fff;
+    cursor:pointer;
+}
+.card-title button:hover{background:#f1f5f9}
 .seg.done{background:var(--done)}
 .seg.doing{background:var(--doing)}
 .seg.can{background:var(--can)}
 .seg.maybe{background:var(--maybe)}
-.seg.risk-red{background:var(--danger);border-right:0}
-.seg.risk-orange{background:var(--warn);border-right:0}
+.seg.risk-red{background:var(--danger);border-right:0;z-index:2}
+.seg.risk-orange{background:var(--warn);border-right:0;z-index:2}
 .grad-line{
     position:absolute;
     top:-3px;
@@ -146,6 +195,9 @@ body{
     font-weight:700;
     border-bottom:1px solid var(--line);
     background:#f8fafc;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
 }
 table{
     width:100%;

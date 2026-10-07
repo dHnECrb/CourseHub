@@ -41,6 +41,15 @@ public class YearTerm {
         return term>yearTerm.getTerm();
     }
 
+    /**获取下一个学期（第一学期→本学年第二学期，第二学期→下一学年第一学期）
+     * @return 下一学期的 YearTerm*/
+    public YearTerm next(){
+        if(term==1){
+            return new YearTerm(year, 2);
+        }
+        return new YearTerm(year+1, 1);
+    }
+
     public String toString(){
         return year+"-"+(year+1)+"-"+term;
     }

@@ -5,14 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>预选课系统</title>
     <link rel="icon" th:href="@{/favicon.ico}" type="image/x-icon">
-    <link th:href="@{/style.css}" rel="stylesheet" type="text/css">
     <link th:href="@{/select_course_style.css}" rel="stylesheet" type="text/css">
     <link th:href="@{/idle_mask.css}" rel="stylesheet" type="text/css">
-    <base target="_blank">
 </head>
 <body>
 
-<!--会话过期的遮罩-->
+<!--会话过期的遮罩（heartbeat.js 依赖此结构）-->
 <div id="idle-mask" style="display:none;">
     <div id="idle-dialog" role="alertdialog" aria-modal="true">
         <div id="idle-title">会话即将过期</div>
@@ -26,6 +24,7 @@
     </div>
 </div>
 
+<!--顶部固定区域：进度条 + 警告信息，不随页面滚动-->
 <header class="fixed-header">
     <section class="progress-panel" aria-label="选课学分进度">
         <div id="practiceBar" class="bar-row"></div>
@@ -45,171 +44,355 @@
 <main class="main">
     <section class="card">
         <div class="card-title">预选课程列表</div>
+        <div class="filter-row">
+            <input type="checkbox" id="filter-will-offer">
+            <label for="filter-will-offer">过滤可能不开课的课程</label>
+            <button id="filter-button" type="button">筛选</button>
+        </div>
         <table>
             <thead>
             <tr>
-                <th style="width:5%">编号</th>
-                <th style="width:24%">课程名称</th>
-                <th style="width:8%">课程学分</th>
-                <th style="width:12%">课程性质</th>
-                <th style="width:10%">能否开课</th>
+                <th style="width:6%">编号</th>
+                <th style="width:12%">课程编号</th>
+                <th style="width:22%">课程名称</th>
+                <th style="width:9%">课程学分</th>
+                <th style="width:13%">课程性质</th>
                 <th style="width:14%">开课学年学期</th>
-                <th style="width:14%">课程编号</th>
+                <th style="width:10%">能否开课</th>
                 <th style="width:8%">选择</th>
             </tr>
             </thead>
             <tbody id="courseBody"></tbody>
         </table>
     </section>
-    <div id="summary" class="summary"></div>
+
+    <div class="submit-row">
+        <button id="submit-button" type="button">提交</button>
+    </div>
+
+    <section class="card">
+        <div class="card-title">
+            <span>我的修读课程（已修、正在修读与已选）</span>
+            <button id="refresh-selected" type="button">刷新</button>
+        </div>
+        <table>
+            <thead>
+            <tr>
+                <th style="width:6%">编号</th>
+                <th style="width:12%">课程编号</th>
+                <th style="width:22%">课程名称</th>
+                <th style="width:9%">课程学分</th>
+                <th style="width:13%">课程性质</th>
+                <th style="width:14%">开课学年学期</th>
+                <th style="width:14%">修读状态</th>
+            </tr>
+            </thead>
+            <tbody id="selectedBody"></tbody>
+        </table>
+    </section>
 </main>
 
 <script th:src="@{/heartbeat.js}"></script>
-
 <script>
-    const categories = {
-        practice: {
-            key:'practice', label:'实践选修课', total:12, graduate:6,
-            completed:2, studying:2,
-            nouns:'实践选修课'
-        },
-        major: {
-            key:'major', label:'专业选修课', total:36, graduate:18,
-            completed:3, studying:7,
-            nouns:'专业选修课'
-        }
+    /* ================= 配置 ================= */
+    // 两种课程性质：总量与毕业要求学分固定，已修/正在修读学分由后端数据计算
+    const CATEGORIES = {
+        practice: { key: 'practice', match: '实践', label: '实践选修课', total: 12, graduate: 6 },
+        major:    { key: 'major',    match: '专业', label: '专业选修课', total: 36, graduate: 18 }
     };
 
-    const courses = [
-        {id:'C001', name:'Web前端项目实训', credit:1, type:'practice', open:'是', term:'2026-2027-1'},
-        {id:'C002', name:'移动应用开发实践', credit:1, type:'practice', open:'是', term:'2026-2027-1'},
-        {id:'C003', name:'创新创业实践', credit:2, type:'practice', open:'否', term:'2026-2027-2'},
-        {id:'C004', name:'机器人综合实验', credit:2, type:'practice', open:'是', term:'2026-2027-2'},
-        {id:'C005', name:'企业实训项目', credit:2, type:'practice', open:'否', term:'2026-2027-2'},
-        {id:'A101', name:'算法设计与分析', credit:3, type:'major', open:'是', term:'2026-2027-1'},
-        {id:'A102', name:'软件体系结构', credit:3, type:'major', open:'是', term:'2026-2027-1'},
-        {id:'A103', name:'人工智能导论', credit:3, type:'major', open:'是', term:'2026-2027-2'},
-        {id:'A104', name:'数据库系统实现', credit:3, type:'major', open:'否', term:'2026-2027-2'},
-        {id:'A105', name:'分布式计算', credit:3, type:'major', open:'否', term:'2026-2027-2'},
-        {id:'A106', name:'计算机图形学', credit:2, type:'major', open:'是', term:'2026-2027-1'},
-        {id:'A107', name:'信息安全工程', credit:2, type:'major', open:'否', term:'2026-2027-2'}
-    ];
+    // 后端接口（context-path /app_1 与前端 JS 约定一致）
+    const URL_TO_SELECT = '/app_1/student/select_course/get_to_select';
+    const URL_SELECTED  = '/app_1/student/select_course/get_selected';
+    // 提交接口后端尚未实现；设计为 POST {select: [课程编号], cancel: [课程编号]}，
+    // 与 SelectCourseService.ChangeSelectCourses(httpSession, courseIdList, insertOrDelete) 对应
+    const URL_SUBMIT    = '/app_1/student/select_course/submit';
 
-    const body = document.getElementById('courseBody');
-    body.innerHTML = courses.map((c, i) => `
-  <tr data-index="${i}">
-    <td>${i + 1}</td>
-    <td class="course-name">${c.name}</td>
-    <td>${c.credit}</td>
-    <td><span class="tag ${c.type === 'practice' ? 'practice' : 'major'}">${categories[c.type].label}</span></td>
-    <td class="${c.open === '是' ? 'yes' : 'no'}">${c.open}</td>
-    <td>${c.term}</td>
-    <td>${c.id}</td>
-    <td><input type="checkbox" class="course-check" data-index="${i}" aria-label="选择${c.name}"></td>
-  </tr>
-`).join('');
+    /* ================= 数据 ================= */
+    let courses = [];                    // 下一学期可选课程（get_to_select）
+    let initialChosen = new Set();       // 加载时已选的课程编号，用于提交时做增量
+    // 已修/正在修读学分（按课程性质累计），来自 get_selected
+    const fixedCredits = { practice: { done: 0, doing: 0 }, major: { done: 0, doing: 0 } };
 
-    function getSelected(){
-        const result = {practice:{can:0, maybe:0}, major:{can:0, maybe:0}};
+    function categoryOf(property) {
+        for (const cat of Object.values(CATEGORIES)) {
+            if (property && property.includes(cat.match)) return cat.key;
+        }
+        return null;
+    }
+
+    /* ================= 待选课程表格 ================= */
+    function renderCourseTable() {
+        const body = document.getElementById('courseBody');
+        body.innerHTML = courses.map((c, i) => `
+            <tr data-course-id="${c.courseId}">
+                <td>${i + 1}</td>
+                <td>${c.courseId}</td>
+                <td class="course-name">${c.courseName}</td>
+                <td>${c.credit}</td>
+                <td>${c.property}</td>
+                <td>${c.term}</td>
+                <!-- willOffer 为“否”的课程此列留空 -->
+                <td class="${c.willOffer === '是' ? 'yes' : ''}">${c.willOffer === '是' ? '是' : ''}</td>
+                <td><input type="checkbox" class="course-check"
+                           data-course-id="${c.courseId}" ${c.chosen ? 'checked' : ''}
+                           aria-label="选择${c.courseName}"></td>
+            </tr>
+        `).join('');
+        applyFilter();
+    }
+
+    function applyFilter() {
+        const hideMaybe = document.getElementById('filter-will-offer').checked;
+        let visibleNo = 0;
+        document.querySelectorAll('#courseBody tr').forEach(tr => {
+            const c = courses.find(x => String(x.courseId) === tr.dataset.courseId);
+            const hidden = hideMaybe && c.willOffer !== '是';
+            tr.style.display = hidden ? 'none' : '';
+            if (!hidden) {
+                // 筛选后编号重新从 1 连续排列
+                tr.cells[0].textContent = ++visibleNo;
+            }
+        });
+    }
+
+    /* ================= 已修课程表格 ================= */
+    function renderSelectedTable(selectedCourses) {
+        const body = document.getElementById('selectedBody');
+        body.innerHTML = selectedCourses.map((c, i) => `
+            <tr>
+                <td>${i + 1}</td>
+                <td>${c.courseId}</td>
+                <td class="course-name">${c.courseName}</td>
+                <td>${c.credit}</td>
+                <td>${c.property}</td>
+                <td>${c.term}</td>
+                <td>${c.status}</td>
+            </tr>
+        `).join('');
+    }
+
+    /* ================= 进度条 ================= */
+    function getCheckedByCategory() {
+        // 统计复选框勾选情况：已选（能开课）与已选（可能开课）的学分
+        const result = { practice: { can: 0, maybe: 0 }, major: { can: 0, maybe: 0 } };
         document.querySelectorAll('.course-check:checked').forEach(box => {
-            const c = courses[Number(box.dataset.index)];
-            result[c.type][c.open === '是' ? 'can' : 'maybe'] += c.credit;
+            const c = courses.find(x => String(x.courseId) === box.dataset.courseId);
+            const key = categoryOf(c.property);
+            if (!key) return;
+            result[key][c.willOffer === '是' ? 'can' : 'maybe'] += c.credit;
         });
         return result;
     }
 
-    function calcState(cat, sel){
-        const fixed = cat.completed + cat.studying;
+    function calcState(cat, sel) {
+        const done = fixedCredits[cat.key].done;
+        const doing = fixedCredits[cat.key].doing;
+        const fixed = done + doing;
         const can = sel.can;
         const maybe = sel.maybe;
-        const certain = fixed + can;
-        const total = certain + maybe;
+        const certain = fixed + can;      // 除去“已选（可能开课）”后的学分
+        const total = certain + maybe;    // 全部已选 + 已修/在读
         let warning = false;
         let risk = null;
-        if(total < cat.graduate){
+        if (total < cat.graduate) {
+            // 红色：从最后一个非空分段（可能开课→能开课→正在修读→已修）之后到毕业学分处
             warning = true;
             let start;
-            if(maybe > 0) start = total;
-            else if(can > 0) start = fixed + can;
-            else if(cat.studying > 0) start = cat.completed + cat.studying;
-            else if(cat.completed > 0) start = cat.completed;
+            if (maybe > 0) start = total;
+            else if (can > 0) start = fixed + can;
+            else if (doing > 0) start = done + doing;
+            else if (done > 0) start = done;
             else start = 0;
-            risk = {kind:'red', start, end:cat.graduate};
-        } else if(certain < cat.graduate){
+            risk = { kind: 'red', start, end: cat.graduate };
+        } else if (certain < cat.graduate) {
+            // 橙色：依赖“可能开课”课程才达标
             warning = true;
-            risk = {kind:'orange', start:certain, end:cat.graduate};
+            risk = { kind: 'orange', start: certain, end: cat.graduate };
         }
-        return {fixed, can, maybe, certain, total, warning, risk};
+        return { done, doing, can, maybe, certain, total, warning, risk };
     }
 
-    function segStyle(width){
-        return ` style="width:${Math.max(0, width)}%"`;
-    }
-
-    function renderBar(cat, sel){
+    function renderBar(cat, sel) {
         const st = calcState(cat, sel);
         const pct = v => v / cat.total * 100;
         const gradPct = cat.graduate / cat.total * 100;
-        const segments = [
-            {name:'done', credit:cat.completed},
-            {name:'doing', credit:cat.studying},
-            {name:'can', credit:st.can},
-            {name:'maybe', credit:st.maybe}
-        ].filter(s => s.credit > 0)
-            .map(s => `<div class="seg ${s.name}" title="${s.credit}学分"${segStyle(pct(s.credit))}></div>`)
-            .join('');
 
-        let riskHtml = '';
-        if(st.risk){
-            riskHtml = `<div class="seg risk-${st.risk.kind}" title="${st.risk.kind === 'red' ? '未达到毕业要求' : '依赖可能开课课程才达标'}"${segStyle(pct(st.risk.end - st.risk.start))}></div>`;
+        // 四个分段按正常顺序排列（已修、正在修读、已选（能开课）、已选（可能开课）），
+        // 风险段（红/橙）作为覆盖层压在“已选（能开课）”末端到及格线之间的区域上
+        const intervals = [
+            { cls: 'done',  label: '已修',             credit: st.done,  left: 0 },
+            { cls: 'doing', label: '正在修读',         credit: st.doing, left: st.done },
+            { cls: 'can',   label: '已选（能开课）',   credit: st.can,   left: st.done + st.doing },
+            { cls: 'maybe', label: '已选（可能开课）', credit: st.maybe, left: st.certain }
+        ];
+        const overlays = [];
+        if (st.risk) {
+            overlays.push({ cls: 'risk-' + st.risk.kind, left: st.risk.start,
+                width: st.risk.end - st.risk.start,
+                title: st.risk.kind === 'red' ? '未达到毕业要求' : '依赖“可能开课”课程才达标' });
         }
 
-        const label = `${st.warning ? '<span class="warn-icon" title="学分不足警告">⚠️</span>' : ''}${cat.label}`;
-        const creditText = `${st.total} / ${cat.graduate}学分`;
-        const row = document.getElementById(cat.key + 'Bar');
-        row.innerHTML = `
-    <div class="bar-label">${label}</div>
-    <div class="progress-track" aria-label="${cat.label}进度">
-      ${segments}${riskHtml}
-      <div class="grad-line" data-credit="${cat.graduate}学分" style="left:${gradPct}%"></div>
-    </div>
-    <div class="total-credit">${creditText}</div>
-  `;
+        // 分段上方的学分标签（宽度与分段一致、非零分段才显示）
+        const segLabels = intervals
+            .filter(s => s.credit > 0)
+            .map(s => `<div class="seg-label" style="left:${pct(s.left)}%;width:${pct(s.credit)}%">${s.label} ${s.credit}</div>`)
+            .join('');
+        const segs = intervals
+            .filter(s => s.credit > 0)
+            .map(s => `<div class="seg ${s.cls}" title="${s.label} ${s.credit}学分"
+                style="left:${pct(s.left)}%;width:${pct(s.credit)}%"></div>`)
+            .join('');
+        // 风险覆盖层（z-index 高于普通分段）
+        const overlaySegs = overlays
+            .map(s => `<div class="seg ${s.cls}" title="${s.title}"
+                style="left:${pct(s.left)}%;width:${pct(s.width)}%"></div>`)
+            .join('');
+
+        // 左侧标志：⚠️ 有学分问题，✅ 去掉“可能开课”后也能毕业
+        const icon = st.warning
+            ? '<span class="warn-icon" title="学分不足警告">⚠️</span>'
+            : '<span class="warn-icon" title="学分满足毕业要求">✅</span>';
+
+        document.getElementById(cat.key + 'Bar').innerHTML = `
+            <div class="bar-label">${icon}${cat.label}</div>
+            <div class="bar-area">
+                <div class="seg-label-row">${segLabels}</div>
+                <div class="progress-track" aria-label="${cat.label}进度">
+                    ${segs}${overlaySegs}
+                    <div class="grad-line" data-credit="${cat.graduate} 学分" style="left:${gradPct}%"></div>
+                </div>
+            </div>
+            <div class="total-credit">${cat.total} 学分</div>
+        `;
         return st;
     }
 
-    function update(){
-        const selected = getSelected();
+    function update() {
+        const selected = getCheckedByCategory();
         const states = {};
-        Object.values(categories).forEach(cat => states[cat.key] = renderBar(cat, selected[cat.key]));
+        Object.values(CATEGORIES).forEach(cat => states[cat.key] = renderBar(cat, selected[cat.key]));
 
+        // 警告信息行
         const problems = [];
-        Object.values(categories).forEach(cat => {
+        Object.values(CATEGORIES).forEach(cat => {
             const st = states[cat.key];
-            if(st.total < cat.graduate){
-                problems.push(`⚠️ ${cat.label}：当前已获得/选择 ${st.total} 学分，距毕业要求还差 ${cat.graduate - st.total} 学分。`);
-            } else if(st.certain < cat.graduate){
-                problems.push(`⚠️ ${cat.label}：除去“已选（可能开课）”课程后仅有 ${st.certain} 学分，仍差 ${cat.graduate - st.certain} 学分。`);
+            if (st.total < cat.graduate) {
+                problems.push(`⚠️ ${cat.label}：已选课程与已修、正在修读学分合计 ${st.total} 学分，距毕业要求（${cat.graduate} 学分）还差 ${cat.graduate - st.total} 学分。`);
+            } else if (st.certain < cat.graduate) {
+                problems.push(`⚠️ ${cat.label}：除去“已选（可能开课）”课程后仅有 ${st.certain} 学分，仍差 ${cat.graduate - st.certain} 学分，请增加确定开课的课程。`);
             }
         });
         document.getElementById('globalWarning').innerHTML = problems.join('　');
+        adjustMainPadding();
 
+        // 勾选行的背景高亮
         document.querySelectorAll('#courseBody tr').forEach(tr => {
-            const box = tr.querySelector('.course-check');
-            tr.classList.toggle('selected', box.checked);
+            tr.classList.toggle('selected', tr.querySelector('.course-check').checked);
         });
-
-        const counts = document.querySelectorAll('.course-check:checked').length;
-        const credits = [...document.querySelectorAll('.course-check:checked')]
-            .reduce((sum, box) => sum + courses[Number(box.dataset.index)].credit, 0);
-        document.getElementById('summary').textContent =
-            `当前已选择 ${counts} 门课程，共 ${credits} 学分。勾选或取消课程后，上方进度条会立即更新。`;
     }
 
+    /* ================= 数据加载 ================= */
+    async function loadToSelect() {
+        const resp = await fetch(URL_TO_SELECT + '?filterWillOffer=false');
+        if (resp.status === 401) {
+            alert('登录过期，请返回登录界面。');
+            window.location.href = '/app_1/login';
+            return;
+        }
+        courses = await resp.json();
+        initialChosen = new Set(courses.filter(c => c.chosen).map(c => String(c.courseId)));
+        renderCourseTable();
+    }
+
+    async function loadSelected() {
+        const resp = await fetch(URL_SELECTED);
+        if (resp.status === 401) {
+            alert('登录过期，请返回登录界面。');
+            window.location.href = '/app_1/login';
+            return;
+        }
+        const selectedCourses = await resp.json();
+        // 按课程性质累计已修、正在修读学分
+        Object.keys(fixedCredits).forEach(k => fixedCredits[k] = { done: 0, doing: 0 });
+        selectedCourses.forEach(c => {
+            const key = categoryOf(c.property);
+            if (!key) return;
+            if (c.status === '已修') fixedCredits[key].done += c.credit;
+            else if (c.status === '正在修读') fixedCredits[key].doing += c.credit;
+        });
+        renderSelectedTable(selectedCourses);
+    }
+
+    async function loadAll() {
+        try {
+            await loadToSelect();
+            await loadSelected();
+            update();
+        } catch (err) {
+            console.error('数据加载失败：', err);
+            alert('数据加载失败，请刷新重试。');
+        }
+    }
+
+    /* ================= 提交 ================= */
+    async function submitSelections() {
+        const checked = new Set(
+            [...document.querySelectorAll('.course-check:checked')]
+                .map(box => box.dataset.courseId)
+        );
+        const toSelect = [...checked].filter(id => !initialChosen.has(id));
+        const toCancel = [...initialChosen].filter(id => !checked.has(id));
+
+        if (toSelect.length === 0 && toCancel.length === 0) {
+            alert('选择没有变化，无需提交。');
+            return;
+        }
+
+        // 学分有问题时先弹窗确认
+        const hasProblem = document.getElementById('globalWarning').textContent.trim().length > 0;
+        if (hasProblem && !confirm('您的课程学分不满足毕业要求（详见上方警告信息），确定仍要提交吗？')) {
+            return;
+        }
+
+        try {
+            const resp = await fetch(URL_SUBMIT, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ select: toSelect, cancel: toCancel })
+            });
+            if (resp.ok) {
+                alert('提交成功！');
+                await loadAll();   // 提交成功后刷新下方已修课程表格
+            } else if (resp.status === 404 || resp.status === 405) {
+                alert('后端提交接口尚未实现，本次选择未保存。\n（计划发送的数据：' +
+                    JSON.stringify({ select: toSelect, cancel: toCancel }) + '）');
+            } else {
+                alert('提交失败：' + resp.status);
+            }
+        } catch (err) {
+            console.error('提交失败：', err);
+            alert('网络错误，提交失败。');
+        }
+    }
+
+    /* ================= 事件绑定 ================= */
+    /* ================= 事件绑定 ================= */
+    // 顶部固定头部高度不固定（警告信息可能换行），动态调整正文的上边距，避免标题被遮挡
+    function adjustMainPadding() {
+        const header = document.querySelector('.fixed-header');
+        document.querySelector('.main').style.paddingTop = (header.offsetHeight + 20) + 'px';
+    }
+    window.addEventListener('resize', adjustMainPadding);
+
     document.addEventListener('change', e => {
-        if(e.target.matches('.course-check')) update();
+        if (e.target.matches('.course-check')) update();
     });
-    update();
+    document.getElementById('filter-button').addEventListener('click', applyFilter);
+    document.getElementById('submit-button').addEventListener('click', submitSelections);
+    document.getElementById('refresh-selected').addEventListener('click', loadSelected);
+
+    loadAll();
 </script>
 </body>
 </html>

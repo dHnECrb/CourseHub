@@ -24,4 +24,38 @@
 <!--        SELECT * FROM select_course WHERE user_id=#{id}-->
 <!--    </select>-->
 
+    <select id="selectSelectedCourses" resultType="com.example.springdemo.dto.SelectedCourseView">
+        SELECT
+            c.id        AS courseId,
+            c.name      AS courseName,
+            c.credit    AS credit,
+            c.property  AS property,
+            c.term      AS term,
+            CASE
+                WHEN c.term = #{currentTerm} THEN '正在修读'
+                WHEN c.term &lt; #{currentTerm} THEN '已修'
+                ELSE '已选'
+            END         AS status
+        FROM select_course sc
+        JOIN course c ON sc.course_id = c.id
+        WHERE sc.user_id = #{userId}
+    </select>
+
+    <select id="selectCoursesToSelect" resultType="com.example.springdemo.dto.SelectingCourseView">
+        SELECT
+            c.id        AS courseId,
+            c.name      AS courseName,
+            c.credit    AS credit,
+            c.property  AS property,
+            c.term      AS term,
+            CASE WHEN c.will_offer THEN '是' ELSE '否' END AS will_offer,
+            (sc.course_id IS NOT NULL) AS is_chosen
+        FROM course c
+        LEFT JOIN select_course sc ON sc.course_id = c.id AND sc.user_id = #{userId}
+        WHERE c.term = #{term}
+        <if test="filterWillOffer">
+            AND c.will_offer = true
+        </if>
+    </select>
+
 </mapper>
