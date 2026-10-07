@@ -1,4 +1,4 @@
-package com.example.springdemo.controller;
+package com.example.springdemo.dto;
 
 
 public final class UserToLogin{

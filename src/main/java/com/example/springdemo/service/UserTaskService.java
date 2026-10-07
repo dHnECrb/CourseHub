@@ -1,10 +1,11 @@
 package com.example.springdemo.service;
 
-import com.baomidou.mybatisplus.core.conditions.Wrapper;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.example.springdemo.dto.RequestResult;
 import com.example.springdemo.entity.UserPosition;
 import com.example.springdemo.entity.UserTask;
 import com.example.springdemo.mapper.UserTaskMapper;
+import com.example.springdemo.util.BasicFunctions;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpSession;
 import org.jspecify.annotations.NonNull;
@@ -12,10 +13,8 @@ import org.springframework.context.MessageSource;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 
 @Service
 public class UserTaskService {
@@ -40,7 +39,7 @@ public class UserTaskService {
     }
 
     public List<UserTask> getTaskByPosition(HttpSession httpSession){
-        String position=BasicFunctions.getPositionFromHttpSession(httpSession);
+        String position= BasicFunctions.getPositionFromHttpSession(httpSession);
 
         LambdaQueryWrapper<UserTask> wrapper = new LambdaQueryWrapper<>();
         wrapper.in(UserTask::getPosition, position, "all");

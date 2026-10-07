@@ -1,4 +1,4 @@
-package com.example.springdemo.service;
+package com.example.springdemo.util;
 
 import com.example.springdemo.entity.UserPosition;
 import jakarta.servlet.http.HttpSession;
@@ -6,7 +6,6 @@ import org.jspecify.annotations.NonNull;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
-import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
 

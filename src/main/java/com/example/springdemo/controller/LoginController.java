@@ -1,7 +1,8 @@
 package com.example.springdemo.controller;
 
+import com.example.springdemo.dto.UserToLogin;
 import com.example.springdemo.manager.LoginCounter;
-import com.example.springdemo.service.RequestResult;
+import com.example.springdemo.dto.RequestResult;
 import com.example.springdemo.service.UserLoginService;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpSession;

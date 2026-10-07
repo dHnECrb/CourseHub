@@ -3,6 +3,7 @@ package com.example.springdemo.service;
 import com.example.springdemo.manager.OnlineUserManager;
 //import com.example.springdemo.mapper.UserMapper;
 //import com.example.springdemo.mapper.UserPasswordMapper;
+import com.example.springdemo.util.BasicFunctions;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpSession;
 import org.jspecify.annotations.NonNull;

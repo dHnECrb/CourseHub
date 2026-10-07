@@ -1,4 +1,4 @@
-package com.example.springdemo.service;
+package com.example.springdemo.dto;
 
 public record RequestResult(boolean isSucceed, int code, String string) {
 }

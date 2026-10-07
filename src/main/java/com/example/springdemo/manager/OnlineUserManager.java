@@ -1,7 +1,7 @@
 package com.example.springdemo.manager;
 
 
-import com.example.springdemo.service.BasicFunctions;
+import com.example.springdemo.util.BasicFunctions;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpSession;
 import org.jspecify.annotations.NonNull;

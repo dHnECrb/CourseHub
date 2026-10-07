@@ -1,11 +1,13 @@
 package com.example.springdemo.service;
 
-import com.example.springdemo.controller.UserToLogin;
+import com.example.springdemo.dto.RequestResult;
+import com.example.springdemo.dto.UserToLogin;
 import com.example.springdemo.entity.UserPassword;
 import com.example.springdemo.entity.UserPosition;
 import com.example.springdemo.manager.LoginCounter;
 import com.example.springdemo.manager.OnlineUserManager;
 import com.example.springdemo.mapper.UserPasswordMapper;
+import com.example.springdemo.util.BasicFunctions;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpSession;
 import org.jspecify.annotations.NonNull;
@@ -35,7 +37,7 @@ public class UserLoginService {
     }
 
     public boolean isAlreadyLoggedIn(@NonNull HttpSession httpSession){
-        boolean result=BasicFunctions.isLoggedIn(httpSession);
+        boolean result= BasicFunctions.isLoggedIn(httpSession);
         String userId=null;
         String log;
         if(httpSession.isNew()) {

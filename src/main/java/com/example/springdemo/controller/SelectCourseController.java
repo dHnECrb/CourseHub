@@ -1,13 +1,11 @@
 package com.example.springdemo.controller;
 
-import com.example.springdemo.service.RequestResult;
+import com.example.springdemo.dto.RequestResult;
 import com.example.springdemo.service.SelectCourseService;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 import org.jspecify.annotations.NonNull;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;

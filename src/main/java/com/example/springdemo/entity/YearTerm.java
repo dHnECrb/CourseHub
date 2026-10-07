@@ -1,5 +1,7 @@
 package com.example.springdemo.entity;
 
+import org.jspecify.annotations.NonNull;
+
 import java.time.LocalDate;
 
 public class YearTerm {
@@ -19,11 +21,31 @@ public class YearTerm {
         return term;
     }
 
+
+    public boolean equals(@NonNull YearTerm yearTerm) {
+        return yearTerm.getTerm()==term && yearTerm.getYear()==year;
+    }
+
+
+    public boolean isBefore(@NonNull YearTerm yearTerm){
+        if(year!=yearTerm.getYear()){
+            return year<yearTerm.getYear();
+        }
+        return term<yearTerm.getTerm();
+    }
+
+    public boolean isAfter(@NonNull YearTerm yearTerm){
+        if(year!=yearTerm.getYear()){
+            return year>yearTerm.getYear();
+        }
+        return term>yearTerm.getTerm();
+    }
+
     public String toString(){
         return year+"-"+(year+1)+"-"+term;
     }
 
-    public static YearTerm parse(String string){
+    public static YearTerm parse(@NonNull String string){
         String[] strings=string.split("-");
         int year1,year2,term;
         if (strings.length!=3){
@@ -40,7 +62,7 @@ public class YearTerm {
         }
         return new YearTerm(year1, term);
     }
-    public static YearTerm parse(LocalDate localDate){
+    public static YearTerm parse(@NonNull LocalDate localDate){
         // 9~12月：year-(year+1)-1
         // 1~2月：(year-1)-year-1
         // 3~8月：(year-1)-year-2
@@ -53,6 +75,10 @@ public class YearTerm {
             return new YearTerm(year-1, 1);
         }
         return new YearTerm(year-1, 2);
+    }
+
+    public static YearTerm now(){
+        return YearTerm.parse(LocalDate.now());
     }
 
 }
