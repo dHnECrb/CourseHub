@@ -73,23 +73,23 @@ public class SelectCourseService {
         return courseMapper.selectList(wrapper);
     }
 
-//    /**批量更新选课
-//     * @param courseIdList 课程号列表
-//     * @param insertOrDelete 新选课(true)还是删除选课(false)*/
-//    public void ChangeSelectCourses(@NonNull HttpSession httpSession, List<Long> courseIdList, boolean insertOrDelete){
-//        Long userId=Long.parseLong((String)httpSession.getAttribute("userId"));
-//        if(!hasPermission(httpSession)){
-//            return ;
-//        }
-//        if(insertOrDelete){
-//            for(Long courseId:courseIdList) {
-//                courseSelectMapper.insert(new CourseSelect(userId, courseId, LocalDateTime.now(), YearTerm.now().toString()));
-//            }
-//        }
-//        else{
-//            courseSelectMapper.deleteByIds(courseIdList);
-//        }
-//    }
+    /**批量更新选课
+     * @param courseIdList 课程号列表
+     * @param insertOrDelete 新选课(true)还是删除选课(false)*/
+    public void ChangeSelectCourses(@NonNull HttpSession httpSession, List<Long> courseIdList, boolean insertOrDelete){
+        Long userId=Long.parseLong((String)httpSession.getAttribute("userId"));
+        if(!hasPermission(httpSession)){
+            return ;
+        }
+        if(insertOrDelete){
+            for(Long courseId:courseIdList) {
+                courseSelectMapper.insert(new CourseSelect(userId, courseId, LocalDateTime.now(), YearTerm.now().toString()));
+            }
+        }
+        else{
+            courseSelectMapper.deleteByIds(courseIdList);
+        }
+    }
 
     /**查询当前学生选的所有课程及其修读状态
      * @param httpSession 当前http会话

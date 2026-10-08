@@ -38,7 +38,7 @@ public class SelectCourseController {
         return selectCourseService.getSelectedCourses(httpSession);
     }
 
-    @GetMapping("get_to_select")
+    @GetMapping("/get_to_select")
     public List<SelectingCourseView> getCoursesToSelect(@NonNull HttpSession httpSession, boolean filterWillOffer){
         return selectCourseService.getCoursesToSelect(httpSession, filterWillOffer);
     }
