@@ -10,6 +10,9 @@
 </head>
 <body>
 
+<!--返回上一级：固定于左上角，不随滚动移动-->
+<button id="back-button" type="button" onclick="history.back()">← 返回上一级</button>
+
 <!--会话过期的遮罩（heartbeat.js 依赖此结构）-->
 <div id="idle-mask" style="display:none;">
     <div id="idle-dialog" role="alertdialog" aria-modal="true">
@@ -20,6 +23,31 @@
         <div id="idle-buttons">
             <button id="idle-stay" class="btn btn-primary">继续会话</button>
             <button id="idle-logout" class="btn btn-secondary">退出登录</button>
+        </div>
+    </div>
+</div>
+
+<!--学分不足提交确认弹窗（自定义，替代浏览器 confirm）-->
+<div id="credit-mask" class="dialog-mask" style="display:none;">
+    <div class="dialog-box" role="alertdialog" aria-modal="true">
+        <div class="dialog-title">⚠️ 学分不足警告</div>
+        <div class="dialog-message" id="credit-message"></div>
+        <div class="dialog-buttons">
+            <button id="credit-confirm" class="btn btn-primary">坚持提交</button>
+            <button id="credit-cancel" class="btn btn-secondary">返回修改</button>
+        </div>
+    </div>
+</div>
+
+<!--筛选确认弹窗（自定义，替代浏览器 confirm）-->
+<div id="filter-mask" class="dialog-mask" style="display:none;">
+    <div class="dialog-box" role="alertdialog" aria-modal="true">
+        <div class="dialog-title">过滤可能不开课的课程</div>
+        <div class="dialog-message">是否同时取消选择所有“可能不开课”的课程？</div>
+        <div class="dialog-buttons">
+            <button id="filter-uncheck" class="btn btn-primary">取消选择并筛选</button>
+            <button id="filter-keep" class="btn btn-secondary">保留选择，仅筛选</button>
+            <button id="filter-abort" class="btn btn-secondary">取消</button>
         </div>
     </div>
 </div>
@@ -113,6 +141,7 @@
     let initialChosen = new Set();       // 加载时已选的课程编号，用于提交时做增量
     // 已修/正在修读学分（按课程性质累计），来自 get_selected
     const fixedCredits = { practice: { done: 0, doing: 0 }, major: { done: 0, doing: 0 } };
+    let currentProblems = [];            // 当前警告信息（供提交弹窗使用）
 
     function categoryOf(property) {
         for (const cat of Object.values(CATEGORIES)) {
@@ -173,6 +202,134 @@
     }
 
     /* ================= 进度条 ================= */
+    // 每个课程性质一条进度条，DOM 只创建一次，之后只改样式，
+    // 靠 CSS transition 实现匀速变化；动画中再次修改会从中途位置继续。
+    const SEG_DEFS = [
+        { cls: 'done',  label: '已修' },
+        { cls: 'doing', label: '正在修读' },
+        { cls: 'can',   label: '已选（能开课）' },
+        { cls: 'maybe', label: '已选（可能开课）' }
+    ];
+    const barStates = {};   // key -> {riskSig, timer}
+
+    function buildBar(cat) {
+        const row = document.getElementById(cat.key + 'Bar');
+        row.innerHTML = `
+            <div class="bar-label"><span class="warn-icon"></span><span>${cat.label}</span></div>
+            <div class="bar-area">
+                <div class="seg-label-row">
+                    ${SEG_DEFS.map(d => `<div class="seg-label seg-label-${d.cls}"></div>`).join('')}
+                </div>
+                <div class="progress-track" aria-label="${cat.label}进度">
+                    ${SEG_DEFS.map(d => `<div class="seg ${d.cls}" style="left:0;width:0"></div>`).join('')}
+                    <div class="seg risk-overlay risk-hidden"></div>
+                    <div class="grad-line" data-credit="${cat.graduate} 学分"
+                         style="left:${cat.graduate / cat.total * 100}%"></div>
+                </div>
+                <div class="risk-info"></div>
+            </div>
+            <div class="total-credit">${cat.total} 学分</div>
+        `;
+        barStates[cat.key] = { riskSig: null, timer: null };
+    }
+
+    /**调整分段上方学分标签，避免相邻文字过近时重叠：放不下时放到第二行交错显示*/
+    function layoutLabels(cat) {
+        const row = document.getElementById(cat.key + 'Bar');
+        const trackW = row.querySelector('.progress-track').clientWidth || 600;
+        // 估算每个标签文字的实际像素宽度（中文约 13px/字）
+        const labels = SEG_DEFS.map(d => {
+            const el = row.querySelector('.seg-label-' + d.cls);
+            if (el.style.display === 'none') return null;
+            const leftPct = parseFloat(el.style.left) || 0;
+            const widthPct = parseFloat(el.style.width) || 0;
+            const textW = el.textContent.length * 13;
+            const centerPx = (leftPct + widthPct / 2) / 100 * trackW;
+            return { el, leftPx: centerPx - textW / 2, rightPx: centerPx + textW / 2 };
+        }).filter(Boolean);
+        // 按从左到右的顺序分配到两行，与同一行上一个标签不重叠即可
+        const rowRight = [0, 0];
+        labels.sort((a, b) => a.leftPx - b.leftPx);
+        labels.forEach(lb => {
+            let line = 0;
+            if (lb.leftPx < rowRight[0] - 4 && lb.leftPx >= rowRight[1] - 4) line = 1;
+            rowRight[line] = lb.rightPx;
+            lb.el.style.top = (line * 20) + 'px';
+        });
+    }
+
+    /**更新风险覆盖层（红/橙）：先淡出，分段变化完成后，新的风险层再淡入*/
+    function setRiskOverlay(cat, st) {
+        const state = barStates[cat.key];
+        const row = document.getElementById(cat.key + 'Bar');
+        const overlay = row.querySelector('.risk-overlay');
+        const info = row.querySelector('.risk-info');
+        const pct = v => v / cat.total * 100;
+
+        const sig = st.risk ? st.risk.kind + ':' + st.risk.start + '-' + st.risk.end : null;
+        if (state.riskSig === sig) return;   // 无变化
+        state.riskSig = sig;
+        clearTimeout(state.timer);
+
+        // 橙色/红色先消失
+        overlay.classList.add('risk-hidden');
+        state.timer = setTimeout(() => {
+            // 更新风险层的样式与数值（此时不可见）
+            overlay.classList.remove('risk-red', 'risk-orange');
+            if (st.risk) {
+                overlay.classList.add('risk-' + st.risk.kind);
+                overlay.style.left = pct(st.risk.start) + '%';
+                overlay.style.width = pct(st.risk.end - st.risk.start) + '%';
+                info.textContent = st.risk.kind === 'red'
+                    ? `距毕业要求还差 ${st.risk.end - st.risk.start} 学分`
+                    : `除去“已选（可能开课）”后仍差 ${st.risk.end - st.risk.start} 学分`;
+                info.className = 'risk-info risk-info-' + st.risk.kind;
+            } else {
+                overlay.style.width = '0';
+                info.textContent = '';
+                info.className = 'risk-info';
+            }
+            // 其他部分完成后，风险层出现
+            state.timer = setTimeout(() => {
+                if (st.risk) overlay.classList.remove('risk-hidden');
+            }, 600);
+        }, 300);
+    }
+
+    function updateBar(cat, st) {
+        const row = document.getElementById(cat.key + 'Bar');
+        const pct = v => v / cat.total * 100;
+        const values = { done: st.done, doing: st.doing, can: st.can, maybe: st.maybe };
+        const leftOf = {
+            done: 0,
+            doing: st.done,
+            can: st.done + st.doing,
+            maybe: st.certain
+        };
+        SEG_DEFS.forEach(d => {
+            const seg = row.querySelector('.seg.' + d.cls);
+            seg.style.left = pct(leftOf[d.cls]) + '%';
+            seg.style.width = pct(values[d.cls]) + '%';
+            seg.classList.toggle('seg-zero', values[d.cls] === 0);
+            const label = row.querySelector('.seg-label-' + d.cls);
+            if (values[d.cls] > 0) {
+                label.style.display = '';
+                label.style.left = pct(leftOf[d.cls]) + '%';
+                label.style.width = pct(values[d.cls]) + '%';
+                label.textContent = `${d.label} ${values[d.cls]}`;
+            } else {
+                label.style.display = 'none';
+            }
+        });
+        layoutLabels(cat);
+        setRiskOverlay(cat, st);
+
+        // 左侧标志：⚠️ 有学分问题，✅ 去掉“可能开课”后也能毕业
+        const icon = row.querySelector('.warn-icon');
+        icon.textContent = st.warning ? '⚠️' : '✅';
+        icon.title = st.warning ? '学分不足警告' : '学分满足毕业要求';
+    }
+
     function getCheckedByCategory() {
         // 统计复选框勾选情况：已选（能开课）与已选（可能开课）的学分
         const result = { practice: { can: 0, maybe: 0 }, major: { can: 0, maybe: 0 } };
@@ -213,77 +370,22 @@
         return { done, doing, can, maybe, certain, total, warning, risk };
     }
 
-    function renderBar(cat, sel) {
-        const st = calcState(cat, sel);
-        const pct = v => v / cat.total * 100;
-        const gradPct = cat.graduate / cat.total * 100;
-
-        // 四个分段按正常顺序排列（已修、正在修读、已选（能开课）、已选（可能开课）），
-        // 风险段（红/橙）作为覆盖层压在“已选（能开课）”末端到及格线之间的区域上
-        const intervals = [
-            { cls: 'done',  label: '已修',             credit: st.done,  left: 0 },
-            { cls: 'doing', label: '正在修读',         credit: st.doing, left: st.done },
-            { cls: 'can',   label: '已选（能开课）',   credit: st.can,   left: st.done + st.doing },
-            { cls: 'maybe', label: '已选（可能开课）', credit: st.maybe, left: st.certain }
-        ];
-        const overlays = [];
-        if (st.risk) {
-            overlays.push({ cls: 'risk-' + st.risk.kind, left: st.risk.start,
-                width: st.risk.end - st.risk.start,
-                title: st.risk.kind === 'red' ? '未达到毕业要求' : '依赖“可能开课”课程才达标' });
-        }
-
-        // 分段上方的学分标签（宽度与分段一致、非零分段才显示）
-        const segLabels = intervals
-            .filter(s => s.credit > 0)
-            .map(s => `<div class="seg-label" style="left:${pct(s.left)}%;width:${pct(s.credit)}%">${s.label} ${s.credit}</div>`)
-            .join('');
-        const segs = intervals
-            .filter(s => s.credit > 0)
-            .map(s => `<div class="seg ${s.cls}" title="${s.label} ${s.credit}学分"
-                style="left:${pct(s.left)}%;width:${pct(s.credit)}%"></div>`)
-            .join('');
-        // 风险覆盖层（z-index 高于普通分段）
-        const overlaySegs = overlays
-            .map(s => `<div class="seg ${s.cls}" title="${s.title}"
-                style="left:${pct(s.left)}%;width:${pct(s.width)}%"></div>`)
-            .join('');
-
-        // 左侧标志：⚠️ 有学分问题，✅ 去掉“可能开课”后也能毕业
-        const icon = st.warning
-            ? '<span class="warn-icon" title="学分不足警告">⚠️</span>'
-            : '<span class="warn-icon" title="学分满足毕业要求">✅</span>';
-
-        document.getElementById(cat.key + 'Bar').innerHTML = `
-            <div class="bar-label">${icon}${cat.label}</div>
-            <div class="bar-area">
-                <div class="seg-label-row">${segLabels}</div>
-                <div class="progress-track" aria-label="${cat.label}进度">
-                    ${segs}${overlaySegs}
-                    <div class="grad-line" data-credit="${cat.graduate} 学分" style="left:${gradPct}%"></div>
-                </div>
-            </div>
-            <div class="total-credit">${cat.total} 学分</div>
-        `;
-        return st;
-    }
-
     function update() {
         const selected = getCheckedByCategory();
-        const states = {};
-        Object.values(CATEGORIES).forEach(cat => states[cat.key] = renderBar(cat, selected[cat.key]));
+        Object.values(CATEGORIES).forEach(cat => updateBar(cat, calcState(cat, selected[cat.key])));
 
-        // 警告信息行
-        const problems = [];
+        // 警告信息：两种课程性质分行显示
+        currentProblems = [];
         Object.values(CATEGORIES).forEach(cat => {
-            const st = states[cat.key];
+            const st = calcState(cat, selected[cat.key]);
             if (st.total < cat.graduate) {
-                problems.push(`⚠️ ${cat.label}：已选课程与已修、正在修读学分合计 ${st.total} 学分，距毕业要求（${cat.graduate} 学分）还差 ${cat.graduate - st.total} 学分。`);
+                currentProblems.push(`⚠️ ${cat.label}：已选课程与已修、正在修读学分合计 ${st.total} 学分，距毕业要求（${cat.graduate} 学分）还差 ${cat.graduate - st.total} 学分。`);
             } else if (st.certain < cat.graduate) {
-                problems.push(`⚠️ ${cat.label}：除去“已选（可能开课）”课程后仅有 ${st.certain} 学分，仍差 ${cat.graduate - st.certain} 学分，请增加确定开课的课程。`);
+                currentProblems.push(`⚠️ ${cat.label}：除去“已选（可能开课）”课程后仅有 ${st.certain} 学分，仍差 ${cat.graduate - st.certain} 学分，请增加确定开课的课程。`);
             }
         });
-        document.getElementById('globalWarning').innerHTML = problems.join('　');
+        document.getElementById('globalWarning').innerHTML =
+            currentProblems.map(p => `<div>${p}</div>`).join('');
         adjustMainPadding();
 
         // 勾选行的背景高亮
@@ -335,25 +437,18 @@
         }
     }
 
+    /* ================= 弹窗工具 ================= */
+    function showMask(id) { document.getElementById(id).style.display = 'flex'; }
+    function hideMask(id) { document.getElementById(id).style.display = 'none'; }
+
     /* ================= 提交 ================= */
-    async function submitSelections() {
+    async function doSubmit() {
         const checked = new Set(
             [...document.querySelectorAll('.course-check:checked')]
                 .map(box => box.dataset.courseId)
         );
         const toSelect = [...checked].filter(id => !initialChosen.has(id));
         const toCancel = [...initialChosen].filter(id => !checked.has(id));
-
-        if (toSelect.length === 0 && toCancel.length === 0) {
-            alert('选择没有变化，无需提交。');
-            return;
-        }
-
-        // 学分有问题时先弹窗确认
-        const hasProblem = document.getElementById('globalWarning').textContent.trim().length > 0;
-        if (hasProblem && !confirm('您的课程学分不满足毕业要求（详见上方警告信息），确定仍要提交吗？')) {
-            return;
-        }
 
         try {
             const resp = await fetch(URL_SUBMIT, {
@@ -376,22 +471,83 @@
         }
     }
 
-    /* ================= 事件绑定 ================= */
+    function submitSelections() {
+        const checkedCount = document.querySelectorAll('.course-check:checked').length;
+        const initialCount = initialChosen.size;
+        if (checkedCount === initialCount &&
+            [...document.querySelectorAll('.course-check:checked')]
+                .every(box => initialChosen.has(box.dataset.courseId))) {
+            alert('选择没有变化，无需提交。');
+            return;
+        }
+
+        if (currentProblems.length === 0) {
+            doSubmit();
+            return;
+        }
+        // 学分不足：自定义弹窗，文字写明警告原因
+        document.getElementById('credit-message').innerHTML =
+            currentProblems.map(p => `<div>${p}</div>`).join('') +
+            '<div style="margin-top:8px">确定仍要提交吗？</div>';
+        showMask('credit-mask');
+    }
+
+    /* ================= 筛选 ================= */
+    function uncheckMaybeCourses() {
+        document.querySelectorAll('.course-check:checked').forEach(box => {
+            const c = courses.find(x => String(x.courseId) === box.dataset.courseId);
+            if (c.willOffer !== '是') box.checked = false;
+        });
+        update();
+    }
+
+    function onFilterClicked() {
+        const checkbox = document.getElementById('filter-will-offer');
+        if (!checkbox.checked) {
+            applyFilter();   // 取消筛选，直接显示全部
+            return;
+        }
+        // 有需要隐藏的已选课程时才询问
+        const anyCheckedMaybe = [...document.querySelectorAll('.course-check:checked')]
+            .some(box => courses.find(x => String(x.courseId) === box.dataset.courseId).willOffer !== '是');
+        if (!anyCheckedMaybe) {
+            applyFilter();
+            return;
+        }
+        showMask('filter-mask');
+    }
+
     /* ================= 事件绑定 ================= */
     // 顶部固定头部高度不固定（警告信息可能换行），动态调整正文的上边距，避免标题被遮挡
     function adjustMainPadding() {
         const header = document.querySelector('.fixed-header');
         document.querySelector('.main').style.paddingTop = (header.offsetHeight + 20) + 'px';
     }
-    window.addEventListener('resize', adjustMainPadding);
+    window.addEventListener('resize', () => {
+        adjustMainPadding();
+        Object.values(CATEGORIES).forEach(layoutLabels);
+    });
 
     document.addEventListener('change', e => {
         if (e.target.matches('.course-check')) update();
     });
-    document.getElementById('filter-button').addEventListener('click', applyFilter);
+    document.getElementById('filter-button').addEventListener('click', onFilterClicked);
     document.getElementById('submit-button').addEventListener('click', submitSelections);
     document.getElementById('refresh-selected').addEventListener('click', loadSelected);
 
+    // 提交确认弹窗按钮
+    document.getElementById('credit-confirm').addEventListener('click', () => { hideMask('credit-mask'); doSubmit(); });
+    document.getElementById('credit-cancel').addEventListener('click', () => hideMask('credit-mask'));
+    // 筛选弹窗按钮
+    document.getElementById('filter-uncheck').addEventListener('click', () => { hideMask('filter-mask'); uncheckMaybeCourses(); applyFilter(); });
+    document.getElementById('filter-keep').addEventListener('click', () => { hideMask('filter-mask'); applyFilter(); });
+    document.getElementById('filter-abort').addEventListener('click', () => {
+        hideMask('filter-mask');
+        document.getElementById('filter-will-offer').checked = false;
+    });
+
+    // 初始化进度条骨架
+    Object.values(CATEGORIES).forEach(buildBar);
     loadAll();
 </script>
 </body>
