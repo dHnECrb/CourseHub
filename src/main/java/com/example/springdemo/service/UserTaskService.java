@@ -143,7 +143,7 @@ public class UserTaskService {
         }
         if(requestResult.code()==401){
             BasicFunctions.printTimeHttpSessionAnd(httpSession,
-                    msgSource.getMessage("logMessage.goTaskWithoutLogin", null, Locale.CHINA));
+                    msgSource.getMessage("logMessage.goTaskWithoutLogin", new Object[]{taskName}, Locale.CHINA));
             return new RequestResult(false, 401,
                     msgSource.getMessage("responseMessage.didNotLogin", null, locale));
         }
