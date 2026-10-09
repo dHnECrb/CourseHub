@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>任务已截止</title>
+    <link rel="icon" th:href="@{/favicon.ico}" type="image/x-icon">
+    <link th:href="@{/error_style.css}" rel="stylesheet" type="text/css">
+</head>
+<body>
+    <div class="error-card">
+        <h1 class="error-code">!</h1>
+        <h2 class="error-title">任务已截止</h2>
+        <p class="error-message" th:text="${message} ?: '该任务已截止，无法再进行操作。'"></p>
+        <div class="error-actions">
+            <button class="error-button" onclick="history.back()">返&nbsp;&nbsp;回</button>
+            <a class="error-link" th:href="@{/main}">回到主界面</a>
+        </div>
+    </div>
+</body>
+</html>

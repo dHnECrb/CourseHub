@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>500 - 服务器错误</title>
+    <link rel="icon" th:href="@{/favicon.ico}" type="image/x-icon">
+    <link th:href="@{/error_style.css}" rel="stylesheet" type="text/css">
+</head>
+<body>
+    <div class="error-card">
+        <h1 class="error-code" th:text="${status}">500</h1>
+        <h2 class="error-title">服务器内部错误</h2>
+        <p class="error-message" th:text="${message} ?: '服务器开小差了，请稍后重试。'"></p>
+        <div class="error-actions">
+            <button class="error-button" onclick="history.back()">返&nbsp;&nbsp;回</button>
+<!--            <a class="error-link" th:href="@{/login}">回到登录页</a>-->
+        </div>
+    </div>
+</body>
+</html>

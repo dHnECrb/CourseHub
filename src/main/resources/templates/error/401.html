@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>401 - 未登录</title>
+    <link rel="icon" th:href="@{/favicon.ico}" type="image/x-icon">
+    <link th:href="@{/error_style.css}" rel="stylesheet" type="text/css">
+</head>
+<body>
+    <div class="error-card">
+        <h1 class="error-code" th:text="${status}">401</h1>
+        <h2 class="error-title">未登录或登录已过期</h2>
+        <p class="error-message" th:text="${message} ?: '请先登录后再访问该页面。'"></p>
+        <div class="error-actions">
+            <a class="error-button" style="display:inline-flex;justify-content:center;align-items:center;text-decoration:none;"
+               href="javascript:history.back()">返回上一页</a>
+            <a class="error-link" th:href="@{/login}">前往登录</a>
+        </div>
+    </div>
+</body>
+</html>
