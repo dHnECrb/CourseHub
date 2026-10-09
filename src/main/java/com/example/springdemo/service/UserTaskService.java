@@ -88,6 +88,9 @@ public class UserTaskService {
         boolean toLate=true;
         wrapper.eq(UserTask::getSite, site);
 //        wrapper.in(UserTask::getPosition, )
+        if(httpSession.getAttribute("userId")==null){
+            return new RequestResult(false, 401, null);
+        }
         List<UserTask> userTaskList=userTaskMapper.selectList(wrapper);
         if(userTaskList.isEmpty()){ // 找不到这个网址
             return new RequestResult(false, 404, null);
