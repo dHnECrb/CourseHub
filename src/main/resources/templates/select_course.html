@@ -80,7 +80,7 @@
         <table>
             <thead>
             <tr>
-                <th style="width:6%">编号</th>
+                <th style="width:6%">序号</th>
                 <th style="width:12%">课程编号</th>
                 <th style="width:22%">课程名称</th>
                 <th style="width:9%">课程学分</th>
@@ -106,7 +106,7 @@
         <table>
             <thead>
             <tr>
-                <th style="width:6%">编号</th>
+                <th style="width:6%">序号</th>
                 <th style="width:12%">课程编号</th>
                 <th style="width:22%">课程名称</th>
                 <th style="width:9%">课程学分</th>
@@ -179,7 +179,7 @@
             const hidden = hideMaybe && c.willOffer !== '是';
             tr.style.display = hidden ? 'none' : '';
             if (!hidden) {
-                // 筛选后编号重新从 1 连续排列
+                // 筛选后序号重新从 1 连续排列
                 tr.cells[0].textContent = ++visibleNo;
             }
         });
