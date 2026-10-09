@@ -8,6 +8,7 @@
     let idleTimer = null;
 
     let warningShowing = false;
+    let visibilityChangedBeforeHeartBeat=false;
 
     // ===== 自定义弹窗相关 =====
     const mask = document.getElementById('idle-mask');
@@ -18,6 +19,10 @@
     let heartbeatTimer = setInterval(heartBeat, HEART_BEAT_TIME);
 
     function heartBeat(){
+        if(visibilityChangedBeforeHeartBeat){
+            lastActiveTime=Date.now()-HEART_BEAT_TIME;
+            visibilityChangedBeforeHeartBeat=false;
+        }
         fetch('/app_1/main/heartbeat', {
             method: 'POST',
             headers: {
@@ -35,6 +40,7 @@
                 if (response.status === 401) {
                     alert("登录过期，点击确定以返回登录界面。");
                     clearInterval(heartbeatTimer);
+                    heartbeatTimer=null;
                     window.location.href = "/app_1/login";
                 }
                 else{
@@ -43,14 +49,14 @@
             })
             // .then(response => response.json())
             .then(data=>{
-                console.log("data:"+data);
+                console.log("HeartBeat返回数值:"+data);
                 if(!data){
                     clearInterval(heartbeatTimer);
                     heartbeatTimer=null;
                 }
             })
             .catch(e => {
-                // clearInterval(heartbeatTimer);
+
                 alert("网络错误");
                 console.error(e);
             })
@@ -156,14 +162,8 @@
     // 6. 真正超时：调用登出接口并跳回登录页
     async function onIdle() {
         // clearInterval(heartbeatTimer);          // 停止心跳
-        try {
-            // await fetch('/app_1/main/logoutAuto', { method: 'POST' });
-            window.location.href='/app_1/main/logoutAuto';
-        } catch (e) {
-            // 即使请求失败也要强制跳转
-        }
-        // alert('由于长时间未操作，您已自动退出登录');
-        // window.location.href = '/app_1/login';
+        window.location.href='/app_1/main/logoutAuto';
+
     }
 
     // ========== 页面隐藏/恢复处理 ==========
@@ -175,10 +175,12 @@
             // } else {
             //     onUserActive();
             // }
+            visibilityChangedBeforeHeartBeat=true;
             if(heartbeatTimer==null){
                 heartbeatTimer = setInterval(heartBeat, HEART_BEAT_TIME);
             }
         } else {
+            visibilityChangedBeforeHeartBeat=false;
             console.log('页面隐藏：用户切换到了其他标签页、最小化了窗口或离开了浏览器');
             clearTimeout(warningTimer);
             clearTimeout(idleTimer);

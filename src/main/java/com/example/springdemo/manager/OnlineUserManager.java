@@ -63,7 +63,7 @@ public class OnlineUserManager {
         httpSession.setAttribute("userId",null);
         httpSession.setAttribute("userPosition",null);
         BasicFunctions.printTimeHttpSessionAnd(httpSession, (String) userId,
-                msgSource.getMessage("logMessage.loggedOutDueToTimeOut", null, Locale.CHINA));
+                msgSource.getMessage("logMessage.loggedOutDueToHeartBeatTimeOut", null, Locale.CHINA));
     }
 
     public void logoutDueToNoActionByBackend(@NonNull HttpSession httpSession){
@@ -116,7 +116,7 @@ public class OnlineUserManager {
                 .stream()
                 .filter(e -> now-e.getValue()>LAST_ACTIVE_TIMEOUT)
                 .forEach(e -> {
-                    logoutDueToTimeOut(e.getKey());
+                    logoutDueToNoActionByBackend(e.getKey());
                     onlineUsers.remove(e.getKey());
                 });
         afterCount= getOnlineSessionCount();
