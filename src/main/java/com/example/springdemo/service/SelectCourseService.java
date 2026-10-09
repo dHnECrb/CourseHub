@@ -10,8 +10,6 @@ import com.example.springdemo.entity.YearTerm;
 import com.example.springdemo.mapper.CourseMapper;
 import com.example.springdemo.mapper.CourseSelectMapper;
 import jakarta.annotation.Resource;
-import jakarta.servlet.annotation.HandlesTypes;
-import jakarta.servlet.annotation.HttpConstraint;
 import jakarta.servlet.http.HttpSession;
 import org.jspecify.annotations.NonNull;
 import org.springframework.context.MessageSource;
@@ -74,21 +72,22 @@ public class SelectCourseService {
     }
 
     /**批量更新选课
-     * @param courseIdList 课程号列表
-     * @param insertOrDelete 新选课(true)还是删除选课(false)*/
-    public void ChangeSelectCourses(@NonNull HttpSession httpSession, List<Long> courseIdList, boolean insertOrDelete){
+     * @param httpSession 当前http会话
+     * @param selectedCourseIdList 增加的选课
+     * @param canceledCourseIdList 取消的选课
+     * */
+    public RequestResult changeSelectCourses(@NonNull HttpSession httpSession, List<Long> selectedCourseIdList,
+                                    List<Long> canceledCourseIdList){
         Long userId=Long.parseLong((String)httpSession.getAttribute("userId"));
         if(!hasPermission(httpSession)){
-            return ;
+            return new RequestResult(false, 403, null);
         }
-        if(insertOrDelete){
-            for(Long courseId:courseIdList) {
-                courseSelectMapper.insert(new CourseSelect(userId, courseId, LocalDateTime.now(), YearTerm.now().toString()));
-            }
+        for(Long courseId:selectedCourseIdList) {
+            courseSelectMapper.insert(new CourseSelect(userId, courseId, LocalDateTime.now(), YearTerm.now().toString()));
         }
-        else{
-            courseSelectMapper.deleteByIds(courseIdList);
-        }
+
+        courseSelectMapper.deleteByIds(canceledCourseIdList);
+        return new RequestResult(true, 200, null);
     }
 
     /**查询当前学生选的所有课程及其修读状态

@@ -1,6 +1,7 @@
 package com.example.springdemo.controller;
 
 import com.example.springdemo.dto.RequestResult;
+import com.example.springdemo.dto.SelectedAndCanceledCourses;
 import com.example.springdemo.dto.SelectedCourseView;
 import com.example.springdemo.dto.SelectingCourseView;
 import com.example.springdemo.service.SelectCourseService;
@@ -8,9 +9,7 @@ import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 import org.jspecify.annotations.NonNull;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.ModelAndView;
 
 import java.io.IOException;
@@ -41,5 +40,21 @@ public class SelectCourseController {
     @GetMapping("/get_to_select")
     public List<SelectingCourseView> getCoursesToSelect(@NonNull HttpSession httpSession, boolean filterWillOffer){
         return selectCourseService.getCoursesToSelect(httpSession, filterWillOffer);
+    }
+
+    @PostMapping("/submit")
+    public boolean submit(@NonNull HttpSession httpSession, @NonNull HttpServletResponse response,
+                          @RequestBody SelectedAndCanceledCourses selectedAndCanceledCourses) throws IOException {
+        RequestResult requestResult=selectCourseService.changeSelectCourses(httpSession,
+                selectedAndCanceledCourses.getSelect(),
+                selectedAndCanceledCourses.getCancel());
+        if(requestResult.isSucceed()){
+            return true;
+        }
+        if(requestResult.code()==200){
+            return false;
+        }
+        response.sendError(requestResult.code());
+        return false;
     }
 }
