@@ -1,30 +1,7 @@
-// 登录成功后启动，每 30 秒上报一次
-heartbeatTimer=setInterval(() => {
-        fetch('/app_1/main/heartbeat', {
-            method: 'POST'
-        })
-            // .then(response => response.text())
-            // .then(data => {
-            //     if(data){
-            //         window.location.href="/app_1/login"
-            //     }
-            // })
-            .then(response => {
-                if(response.status===401){
-                    alert("登录过期，请返回登录界面。");
-                    window.location.href="/app_1/login";
-                }
-            })
-            .catch(e => {
-                // clearInterval(heartbeatTimer);
-                alert("网络错误");
-    });
-}, 30 * 1000);
-
-
 (function () {
     const IDLE_LIMIT = 5 * 60 * 1000;   // 5 分钟无操作视为离开
     const WARN_BEFORE = 60 * 1000;      // 超时前 60 秒弹出警告，可续期
+    const HEART_BEAT_TIME = 30 * 1000
 
     let lastActiveTime = Date.now();
     let warningTimer = null;
@@ -36,6 +13,49 @@ heartbeatTimer=setInterval(() => {
     const mask = document.getElementById('idle-mask');
     const countdownEl = document.getElementById('idle-countdown');
     let countdownInterval = null;
+
+    // 心跳机制，登录成功后启动，每 30 秒上报一次
+    let heartbeatTimer = setInterval(heartBeat, HEART_BEAT_TIME);
+
+    function heartBeat(){
+        fetch('/app_1/main/heartbeat', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({lastActiveTime:lastActiveTime})
+        })
+            // .then(response => response.text())
+            // .then(data => {
+            //     if(data){
+            //         window.location.href="/app_1/login"
+            //     }
+            // })
+            .then(response => {
+                if (response.status === 401) {
+                    alert("登录过期，点击确定以返回登录界面。");
+                    clearInterval(heartbeatTimer);
+                    window.location.href = "/app_1/login";
+                }
+                else{
+                    return response.json();
+                }
+            })
+            // .then(response => response.json())
+            .then(data=>{
+                console.log("data:"+data);
+                if(!data){
+                    clearInterval(heartbeatTimer);
+                    heartbeatTimer=null;
+                }
+            })
+            .catch(e => {
+                // clearInterval(heartbeatTimer);
+                alert("网络错误");
+                console.error(e);
+            })
+        ;
+    }
 
     // 1. 节流：mousemove 每 200ms 最多执行一次
     function throttle(fn, delay) {
@@ -149,15 +169,19 @@ heartbeatTimer=setInterval(() => {
     // ========== 页面隐藏/恢复处理 ==========
     document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'visible') {
-            // 切回来时检查：离开期间是否已超时
             console.log('页面可见：用户切回了当前标签页或恢复了窗口');
-            if (Date.now() - lastActiveTime > IDLE_LIMIT) {
-                onIdle();
-            } else {
-                onUserActive();
+            // if (Date.now() - lastActiveTime > IDLE_LIMIT) {
+            //     onIdle();
+            // } else {
+            //     onUserActive();
+            // }
+            if(heartbeatTimer==null){
+                heartbeatTimer = setInterval(heartBeat, HEART_BEAT_TIME);
             }
         } else {
             console.log('页面隐藏：用户切换到了其他标签页、最小化了窗口或离开了浏览器');
+            clearTimeout(warningTimer);
+            clearTimeout(idleTimer);
         }
     });
 

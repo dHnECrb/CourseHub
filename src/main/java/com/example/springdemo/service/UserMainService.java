@@ -1,5 +1,6 @@
 package com.example.springdemo.service;
 
+import com.example.springdemo.dto.RequestResult;
 import com.example.springdemo.manager.OnlineUserManager;
 //import com.example.springdemo.mapper.UserMapper;
 //import com.example.springdemo.mapper.UserPasswordMapper;
@@ -11,6 +12,9 @@ import org.jspecify.annotations.NonNull;
 import org.springframework.context.MessageSource;
 import org.springframework.stereotype.Service;
 
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.Locale;
 
 @Service
@@ -48,15 +52,19 @@ public class UserMainService {
         }
     }
 
-    public boolean heartbeat(@NonNull HttpSession httpSession){
+    public RequestResult heartbeat(@NonNull HttpSession httpSession, @NonNull Long lastActiveTime){
+        boolean isSucceed;
         if(BasicFunctions.isLoggedIn(httpSession)){
-            onlineUserManager.heartbeat(httpSession);
-            BasicFunctions.printTimeHttpSessionAnd(httpSession, (String)httpSession.getAttribute("userId"), "心跳");
-            return true;
+            isSucceed=onlineUserManager.heartbeat(httpSession, lastActiveTime);
+            BasicFunctions.printTimeHttpSessionAnd(httpSession, (String)httpSession.getAttribute("userId"),
+                    "心跳\t"+ Instant.ofEpochMilli(lastActiveTime)
+                            .atZone(ZoneId.systemDefault())
+                            .toLocalDateTime());
+            return new RequestResult(isSucceed, 200, null);
         }
         else{
             BasicFunctions.printTimeHttpSessionAnd(httpSession, "未登录用户心跳");
-            return false;
+            return new RequestResult(false, 401, null);
         }
     }
 

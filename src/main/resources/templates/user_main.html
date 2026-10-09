@@ -5,6 +5,7 @@
     <title>用户主页</title>
     <link rel="icon" th:href="@{/favicon.ico}" type="image/x-icon">
     <link th:href="@{/user_main_style.css}" rel="stylesheet" type="text/css">
+    <link th:href="@{/idle_mask.css}" rel="stylesheet" type="text/css">
 </head>
 <body>
 
@@ -30,7 +31,7 @@
         </div>
         <div id="header-right">
             <p th:text="${userId}"></p>
-            <button type="button" onClick="window.location.href='/app_1/main/logout'" id="logout-button">注销</button>
+            <button type="button" onClick="window.location.href='/app_1/main/logout'" id="logout-button">退出</button>
 
         </div>
     </div>

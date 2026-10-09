@@ -23,7 +23,7 @@ public class SelectCourseController {
     private SelectCourseService selectCourseService;
 
     @GetMapping
-    public ModelAndView index(@NonNull HttpSession httpSession, HttpServletResponse response) throws IOException {
+    public ModelAndView index(@NonNull HttpSession httpSession, @NonNull HttpServletResponse response) throws IOException {
         RequestResult requestResult=selectCourseService.index(httpSession);
 
         if(requestResult.isSucceed()){

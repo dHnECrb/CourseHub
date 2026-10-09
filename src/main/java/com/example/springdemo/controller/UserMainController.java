@@ -1,18 +1,22 @@
 package com.example.springdemo.controller;
 
 
+import com.example.springdemo.dto.HeartBeatRequest;
+import com.example.springdemo.dto.RequestResult;
 import com.example.springdemo.entity.UserTask;
 import com.example.springdemo.service.UserMainService;
 import com.example.springdemo.service.UserTaskService;
 import jakarta.annotation.Resource;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 import org.jspecify.annotations.NonNull;
 import org.springframework.context.MessageSource;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.ModelAndView;
 
+import java.io.IOException;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Locale;
 
@@ -56,13 +60,31 @@ public class UserMainController {
         return modelAndView;
     }
 
+
+//    @PostMapping("/heartbeat")
+//    public ResponseEntity<Void> heartbeat(@NonNull HttpSession httpSession){
+//        boolean result= userMainService.heartbeat(httpSession);
+//        if (result) {
+//            return ResponseEntity.ok().build(); // 200 ok
+//        }
+//        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build(); // 401错误
+//    }
+
     @PostMapping("/heartbeat")
-    public ResponseEntity<Void> heartbeat(@NonNull HttpSession httpSession){
-        boolean result= userMainService.heartbeat(httpSession);
-        if (result) {
-            return ResponseEntity.ok().build(); // 200 ok
+    public boolean heartbeat(@NonNull HttpSession httpSession, @NonNull HttpServletResponse response,
+                             @RequestBody HeartBeatRequest lastActiveTime) throws IOException {
+        RequestResult requestResult = userMainService.heartbeat(httpSession, lastActiveTime.getLastActiveTime().getTime());
+        if(requestResult.isSucceed()){
+            return true;
         }
-        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build(); // 401错误
+        if (requestResult.code() == 200) {
+            return false;
+        }
+        if(requestResult.code()==401){
+            response.sendError(401);
+            return false;
+        }
+        throw new IllegalArgumentException("无效代码");
     }
 
     @GetMapping("/tasks")
@@ -91,9 +113,9 @@ public class UserMainController {
         Locale locale=Locale.CHINA;
         userMainService.logoutDueToNoAction(httpSession);
         modelAndView.setViewName("login_info_general");
-        modelAndView.addObject("title", "自动注销");
+        modelAndView.addObject("title", "自动退出");
 //        modelAndView.addObject("parent", "../");
-        modelAndView.addObject("h1_text","自动注销");
+        modelAndView.addObject("h1_text","自动退出");
         modelAndView.addObject("reason",msgSource.getMessage("responseMessage.logoutDueToNoAction", null, locale));
         modelAndView.addObject("button_event","/app_1/login");
         modelAndView.addObject("button_text","登    录");

@@ -20,23 +20,39 @@ public class OnlineUserManager {
     @Resource
     private MessageSource msgSource;
 
-    /** key: sessionId, value: 最近活跃时间*/
+    /** key: sessionId, value: 最近心跳时间*/
     private final Map<HttpSession, Long> onlineUsers = new ConcurrentHashMap<>();
 
+    /** key: sessionId, value: 最近操作时间*/
+    private final Map<HttpSession, Long> onlineUsersLastActive = new ConcurrentHashMap<>();
+
     /** 心跳超时阈值：超过 2 分钟无心跳视为离线 */
-    private static final long TIMEOUT = 2 * 60 * 1000L;
+    private static final long HEART_BEAT_TIMEOUT = 2 * 60 * 1000L;
+
+    /** 操作超时阈值：超过 6 分钟无操作视为离线 */
+    private static final long LAST_ACTIVE_TIMEOUT = 6 * 60 * 1000L;
 
     public void login(HttpSession httpSession) {
         onlineUsers.put(httpSession, System.currentTimeMillis());
+        onlineUsersLastActive.put(httpSession, System.currentTimeMillis());
     }
 
-    public void heartbeat(HttpSession httpSession) {
+    public boolean heartbeat(@NonNull HttpSession httpSession, @NonNull Long lastActiveTime) {
+        Long storedLastActive = onlineUsersLastActive.get(httpSession);
+//        System.out.println(lastActiveTime+"\t"+storedLastActive);
+        if(lastActiveTime<storedLastActive){
+            return false;
+        }
+
         onlineUsers.computeIfPresent(httpSession,
                 (k, v) -> System.currentTimeMillis());
+        onlineUsersLastActive.replace(httpSession, lastActiveTime);
+        return true;
     }
 
     public void logout(HttpSession httpSession) {// 用户手动注销或超时未操作而自动注销
         onlineUsers.remove(httpSession);
+        onlineUsersLastActive.remove(httpSession);
     }
 
     public void logoutDueToTimeOut(@NonNull HttpSession httpSession){
@@ -48,6 +64,18 @@ public class OnlineUserManager {
         httpSession.setAttribute("userPosition",null);
         BasicFunctions.printTimeHttpSessionAnd(httpSession, (String) userId,
                 msgSource.getMessage("logMessage.loggedOutDueToTimeOut", null, Locale.CHINA));
+    }
+
+    public void logoutDueToNoActionByBackend(@NonNull HttpSession httpSession){
+        Object userId=httpSession.getAttribute("userId");
+        if(userId==null){
+            return;
+        }
+        httpSession.setAttribute("userId",null);
+        httpSession.setAttribute("userPosition",null);
+        BasicFunctions.printTimeHttpSessionAnd(httpSession, (String) userId,
+                msgSource.getMessage("logMessage.loggedOutDueToNoAction_backend", null, Locale.CHINA));
+
     }
 
     /**获取已登录会话数量（注意同一个用户可以在多个会话中登录）*/
@@ -79,9 +107,17 @@ public class OnlineUserManager {
 //        onlineUsers.entrySet().removeIf(e -> now - e.getValue() > TIMEOUT);
         onlineUsers.entrySet()
                 .stream()
-                .filter(e -> now - e.getValue() > TIMEOUT)
+                .filter(e -> now - e.getValue() > HEART_BEAT_TIMEOUT)
                 .forEach(e -> {
                     logoutDueToTimeOut(e.getKey());
+                    onlineUsersLastActive.remove(e.getKey());
+                });
+        onlineUsersLastActive.entrySet()
+                .stream()
+                .filter(e -> now-e.getValue()>LAST_ACTIVE_TIMEOUT)
+                .forEach(e -> {
+                    logoutDueToTimeOut(e.getKey());
+                    onlineUsers.remove(e.getKey());
                 });
         afterCount= getOnlineSessionCount();
         return beforeCount-afterCount;
