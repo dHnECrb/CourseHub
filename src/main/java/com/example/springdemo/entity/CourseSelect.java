@@ -32,16 +32,4 @@ public class CourseSelect {
         this.user_id = user_id;
         this.course_id = course_id;
     }
-
-    public Long getUser_id() {
-        return user_id;
-    }
-
-    public Long getCourse_id() {
-        return course_id;
-    }
-
-    public LocalDateTime getSelect_time() {
-        return select_time;
-    }
 }
