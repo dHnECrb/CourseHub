@@ -37,8 +37,10 @@
     </div>
     <div id="main-div">
         <div id="option">
-            <input type="checkbox" id="filter-time" checked>
-            <label for="filter-time">筛选在时间范围内的任务</label>
+            <div>
+                <input type="checkbox" id="filter-time" checked>
+                <label for="filter-time">筛选在时间范围内的任务</label>
+            </div>
             <button onclick="refreshTaskTable()">刷新任务</button>
         </div>
         <table>
@@ -81,12 +83,15 @@
 
                     tasks.forEach((task, index) => {
                         const tr = document.createElement('tr');
+                        // 将 ISO 时间格式化为 "YYYY-MM-DD HH:mm"
+                        const formatTime = (t) => (t || '').replace('T', ' ').slice(0, 16) || '—';
+                        const comment = task.comment && task.comment.trim() ? task.comment : '—';
                         tr.innerHTML =
                             `<td>${index + 1}</td>` +
                             `<td>${task.name}</td>` +
-                            `<td>${task.comment}</td>` +
-                            `<td>${task.start_time}</td>` +
-                            `<td>${task.deadline_time}</td>` +
+                            `<td>${comment}</td>` +
+                            `<td>${formatTime(task.start_time)}</td>` +
+                            `<td>${formatTime(task.deadline_time)}</td>` +
                             `<td><a href="/app_1${task.site}">进入 ${task.name}</a></td>`;
                         tbody.appendChild(tr);
                     });

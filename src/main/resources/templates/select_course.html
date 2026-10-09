@@ -86,7 +86,7 @@
                 <th style="width:9%">课程学分</th>
                 <th style="width:13%">课程性质</th>
                 <th style="width:14%">开课学年学期</th>
-                <th style="width:10%">能否开课</th>
+                <th style="width:10%">是否开课</th>
                 <th style="width:8%">选择</th>
             </tr>
             </thead>
@@ -150,6 +150,12 @@
         return null;
     }
 
+    // 课程性质列：不同性质渲染成不同配色的圆角标签
+    function propertyTag(property) {
+        const key = categoryOf(property);
+        return key ? `<span class="tag ${key}">${property}</span>` : property;
+    }
+
     /* ================= 待选课程表格 ================= */
     function renderCourseTable() {
         const body = document.getElementById('courseBody');
@@ -159,7 +165,7 @@
                 <td>${c.courseId}</td>
                 <td class="course-name">${c.courseName}</td>
                 <td>${c.credit}</td>
-                <td>${c.property}</td>
+                <td>${propertyTag(c.property)}</td>
                 <td>${c.term}</td>
                 <!-- willOffer 为“否”的课程此列留空 -->
                 <td class="${c.willOffer === '是' ? 'yes' : ''}">${c.willOffer === '是' ? '是' : ''}</td>
@@ -186,15 +192,20 @@
     }
 
     /* ================= 已修课程表格 ================= */
+    // 修读状态排序：已选在前，正在修读其次，已修最后
+    const STATUS_ORDER = { '已选': 0, '正在修读': 1, '已修': 2 };
     function renderSelectedTable(selectedCourses) {
         const body = document.getElementById('selectedBody');
-        body.innerHTML = selectedCourses.map((c, i) => `
+        const sorted = [...selectedCourses].sort(
+            (a, b) => (STATUS_ORDER[a.status] ?? 3) - (STATUS_ORDER[b.status] ?? 3)
+        );
+        body.innerHTML = sorted.map((c, i) => `
             <tr>
                 <td>${i + 1}</td>
                 <td>${c.courseId}</td>
                 <td class="course-name">${c.courseName}</td>
                 <td>${c.credit}</td>
-                <td>${c.property}</td>
+                <td>${propertyTag(c.property)}</td>
                 <td>${c.term}</td>
                 <td>${c.status}</td>
             </tr>
@@ -457,10 +468,10 @@
                 body: JSON.stringify({ select: toSelect, cancel: toCancel })
             });
             if (resp.ok) {
-                alert('提交成功！');
+                alert('提交成功！\n但请注意，这只是预选课，你仍要在教务系统正式选课！\n正式选课时间大约在寒假期间。');
                 await loadAll();   // 提交成功后刷新下方已修课程表格
             } else if (resp.status === 404 || resp.status === 405) {
-                alert('后端提交接口尚未实现，本次选择未保存。\n（计划发送的数据：' +
+                alert('后端提交接口被关闭，本次选择未保存。\n（计划发送的数据：' +
                     JSON.stringify({ select: toSelect, cancel: toCancel }) + '）');
             } else {
                 alert('提交失败：' + resp.status);
