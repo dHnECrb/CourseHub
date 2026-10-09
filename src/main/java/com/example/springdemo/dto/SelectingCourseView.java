@@ -11,8 +11,8 @@ public class SelectingCourseView {
     private int     credit;     // 课程学分
     private String  property;   // 课程性质
     private String  term;       // 开课学年学期
-    private String  willOffer; // 能否开课
-    private boolean isChosen;  // 是否选择
+    private String  willOffer;  // 能否开课
+    private boolean isChosen;   // 是否选择
 
     public SelectingCourseView(Long courseId, String courseName, int credit, String property, String term, String willOffer, boolean isChosen) {
         this.courseId = courseId;
