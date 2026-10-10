@@ -86,7 +86,12 @@ public class SelectCourseService {
             courseSelectMapper.insert(new CourseSelect(userId, courseId, LocalDateTime.now(), YearTerm.now().toString()));
         }
 
-        courseSelectMapper.deleteByIds(canceledCourseIdList);
+        if(!canceledCourseIdList.isEmpty()){
+            LambdaQueryWrapper<CourseSelect> wrapper = new LambdaQueryWrapper<>();
+            wrapper.eq(CourseSelect::getUser_id, userId)
+                    .in(CourseSelect::getCourse_id, canceledCourseIdList);
+            courseSelectMapper.delete(wrapper);
+        }
         return new RequestResult(true, 200, null);
     }
 
