@@ -55,26 +55,30 @@ public class OnlineUserManager {
         onlineUsersLastActive.remove(httpSession);
     }
 
-    public void logoutDueToTimeOut(@NonNull HttpSession httpSession){
-        Object userId=httpSession.getAttribute("userId");
+    private void logoutAuto(@NonNull HttpSession httpSession, String message){
+        Object userId;
+        try {
+            userId = httpSession.getAttribute("userId");
+        } catch (IllegalStateException e) {
+            BasicFunctions.printTimeHttpSessionAnd(httpSession,
+                    msgSource.getMessage("logMessage.loggedOutInvalidatedSession", null, Locale.CHINA));
+            return;
+        }
         if(userId==null){
             return;
         }
         httpSession.setAttribute("userId",null);
         httpSession.setAttribute("userPosition",null);
-        BasicFunctions.printTimeHttpSessionAnd(httpSession, (String) userId,
-                msgSource.getMessage("logMessage.loggedOutDueToHeartBeatTimeOut", null, Locale.CHINA));
+        BasicFunctions.printTimeHttpSessionAnd(httpSession, (String) userId, message);
+
+    }
+
+    public void logoutDueToTimeOut(@NonNull HttpSession httpSession){
+        logoutAuto(httpSession, msgSource.getMessage("logMessage.loggedOutDueToHeartBeatTimeOut", null, Locale.CHINA));
     }
 
     public void logoutDueToNoActionByBackend(@NonNull HttpSession httpSession){
-        Object userId=httpSession.getAttribute("userId");
-        if(userId==null){
-            return;
-        }
-        httpSession.setAttribute("userId",null);
-        httpSession.setAttribute("userPosition",null);
-        BasicFunctions.printTimeHttpSessionAnd(httpSession, (String) userId,
-                msgSource.getMessage("logMessage.loggedOutDueToNoAction_backend", null, Locale.CHINA));
+        logoutAuto(httpSession, msgSource.getMessage("logMessage.loggedOutDueToNoAction_backend", null, Locale.CHINA));
 
     }
 
@@ -110,6 +114,7 @@ public class OnlineUserManager {
                 .filter(e -> now - e.getValue() > HEART_BEAT_TIMEOUT)
                 .forEach(e -> {
                     logoutDueToTimeOut(e.getKey());
+                    onlineUsers.remove(e.getKey());
                     onlineUsersLastActive.remove(e.getKey());
                 });
         onlineUsersLastActive.entrySet()
@@ -118,6 +123,7 @@ public class OnlineUserManager {
                 .forEach(e -> {
                     logoutDueToNoActionByBackend(e.getKey());
                     onlineUsers.remove(e.getKey());
+                    onlineUsersLastActive.remove(e.getKey());
                 });
         afterCount= getOnlineSessionCount();
         return beforeCount-afterCount;
