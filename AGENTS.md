@@ -10,6 +10,7 @@ springDemo 是一个基于 Spring Boot 的 Web 应用（作者的第一个 Sprin
 - 基于 HttpSession 的会话管理：前端每 30 秒发送心跳，服务器定时剔除超时会话，前端检测 5 分钟无操作自动注销
 - 任务系统（UserTask）：按角色（含 "all"）和起止时间控制功能入口的开放
 - 学生预选课页面（`/student/select_course`，目前前后端尚未完全接通）
+- 选课结果查询页面（`/admin/course_select_result`，管理员按课程/按学生两个维度查看选课情况）
 
 顶层包为 `com.example.springdemo`，主类是 `SpringDemoApplication.java`（同时充当 `/index` 路径的演示用 Controller）。
 
@@ -50,8 +51,8 @@ java -jar target/springDemo-0.0.1-SNAPSHOT.jar   # 运行打包产物
 ## 代码组织（`src/main/java/com/example/springdemo/`）
 
 - `SpringDemoApplication.java`：启动类，带 `@EnableScheduling`（定时任务）和 `@MapperScan("com.example.springdemo.mapper")`；同时是 `/index` 下的演示接口。
-- `controller/`：登录（`LoginController`，`/login`）、主界面（`UserMainController`，`/main`，含心跳、任务列表、注销）、选课（`SelectCourseController`，`/student/select_course`）；`UserToLogin` 是登录表单 DTO。
-- `service/`：业务逻辑。`UserLoginService`（登录校验）、`UserMainService`（会话心跳/注销）、`UserTaskService`（按角色/时间校验任务入口，`tryGoTask` 返回特定错误码）、`SelectCourseService`、`ScheduledTasksService`（每 30 秒剔除无心跳会话）、`BasicFunctions`（时间格式化、日志打印、防时序攻击的字符串比较等静态工具）、`RequestResult`（`record(isSucceed, code, string)`，各层通用的结果载体）、`LoginStatus`（目前未被使用的枚举）。
+- `controller/`：登录（`LoginController`，`/login`）、主界面（`UserMainController`，`/main`，含心跳、任务列表、注销）、选课（`SelectCourseController`，`/student/select_course`）、选课结果查询（`SeeSelectedCourseController`，`/admin/course_select_result`，管理员查看学生选课汇总与明细）；`UserToLogin` 是登录表单 DTO。
+- `service/`：业务逻辑。`UserLoginService`（登录校验）、`UserMainService`（会话心跳/注销）、`UserTaskService`（按角色/时间校验任务入口，`tryGoTask` 返回特定错误码）、`SelectCourseService`、`SeeSelectedCourseService`（管理员的选课结果查询：按课程汇总 GROUP_CONCAT 学生姓名、学生×课程明细矩阵，统计下学期 `YearTerm.now().next()` 的预选数据，学生口径为 `user` JOIN `userPassword` 中 `position='student'`）、`ScheduledTasksService`（每 30 秒剔除无心跳会话）、`BasicFunctions`（时间格式化、日志打印、防时序攻击的字符串比较等静态工具）、`RequestResult`（`record(isSucceed, code, string)`，各层通用的结果载体）、`LoginStatus`（目前未被使用的枚举）。
 - `manager/`：`OnlineUserManager`（`ConcurrentHashMap<HttpSession, Long>` 维护在线会话，2 分钟无心跳视为离线）；`LoginCounter`（枚举单例，统计各角色登录人次）。
 - `entity/`：`User`（表 `user`）、`UserPassword`（表 `userPassword`）、`Course`（表 `course`）、`CourseSelect`（表 `select_course`）、`UserTask`（表 `task`），以及枚举 `UserPosition` 和值对象 `YearTerm`（学年学期，格式 `YYYY-YYYY-1/2`，9~2 月为第一学期）。
 - `mapper/`：5 个 MyBatis-Plus 的 `BaseMapper` 接口（`@Mapper` 标注），XML 文件在 `src/main/resources/mapper/*.xml`。
@@ -59,7 +60,7 @@ java -jar target/springDemo-0.0.1-SNAPSHOT.jar   # 运行打包产物
 ### 资源文件（`src/main/resources/`）
 
 - `application.yml`：数据源等配置（见上文，被 gitignore）。
-- `templates/`：Thymeleaf 页面（index 即登录页、login_* 系列结果页、user_main、select_course、error/403）。
+- `templates/`：Thymeleaf 页面（index 即登录页、login_* 系列结果页、user_main、select_course、course_select_result、error/403）。
 - `static/`：原生 JS/CSS（`heartbeat.js` 心跳与空闲检测、`script1.js` 登录表单）。
 - `mapper/*.xml`：MyBatis 映射文件，**内容几乎全部被注释掉**——项目实际使用 MyBatis-Plus 的 `BaseMapper` 方法，手写 SQL 仅作历史参考保留。
 - `messages_zh_CN.properties`：唯一的国际化消息文件，`logMessage.*`（服务端日志）与 `responseMessage.*`（前端提示）两组 key 通过 `MessageSource` 使用；`messages.properties` 为空文件；`messages_en_US.properties `（**文件名末尾有一个空格**）也是空文件。
@@ -92,4 +93,5 @@ java -jar target/springDemo-0.0.1-SNAPSHOT.jar   # 运行打包产物
 - `src/main/resources/templates/.idea/` 下误提交了一套 IDE 配置目录，与根目录 `.idea/` 无关，可考虑删除。
 - `messages_en_US.properties `（文件名末尾有空格）和 `messages.properties` 均为空文件，只有中文消息真正生效。
 - 选课功能尚未完成：`SelectCourseService` 有取课、批量改选方法，但 `SelectCourseController` 只有入口页，`select_course.html` 的接口对接仍在开发中（工作区有未提交的改动）。
+- 选课结果查询（`SeeSelectedCourseController`，`/admin/course_select_result`）已完成：任务入口依赖 `task` 表中 site 为 `/admin/course_select_result`、position 为 `admin` 的记录（本地数据库已存在），没有该记录时入口返回 404。
 - `LoginStatus` 枚举、`SpringDemoApplication` 中被注释的 `/test` 接口等属于遗留/未接线的代码。

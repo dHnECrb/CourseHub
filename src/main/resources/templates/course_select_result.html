@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>学生选课结果查询</title>
+    <link rel="icon" th:href="@{/favicon.ico}" type="image/x-icon">
+    <link th:href="@{/select_course_style.css}" rel="stylesheet" type="text/css">
+    <link th:href="@{/idle_mask.css}" rel="stylesheet" type="text/css">
+    <style>
+        /*详细信息表：页面向下滚动时表头固定在页面顶部。
+          注意：表头祖先不能有 overflow 滚动容器（卡片 overflow:hidden 也不行），
+          否则吸顶相对的是容器而不是窗口，所以卡片单独放开裁剪*/
+        #detailCard{overflow:visible}
+        #detailTable thead th{
+            position:sticky;
+            top:0;
+            z-index:10;
+        }
+        /*列数多，压缩明细表单元格让列尽量窄*/
+        #detailTable th,#detailTable td{padding:8px 4px;font-size:13px}
+        /*可能不开课的课程列：表头背景浅绿色*/
+        #detailTable thead th.th-not-offered{background:#dff3df}
+        /*可能不开课的课程列：单元格“选”橙色、“不选”黑色*/
+        #detailTable td.choose{color:#ff8a00;font-weight:700}
+        #detailTable td.skip{color:#111111}
+    </style>
+</head>
+<body>
+
+<!--返回上一级：固定于左上角，不随滚动移动-->
+<button id="back-button" type="button" onclick="history.back()">← 返回上一级</button>
+
+<!--会话过期的遮罩（heartbeat.js 依赖此结构）-->
+<div id="idle-mask" style="display:none;">
+    <div id="idle-dialog" role="alertdialog" aria-modal="true">
+        <div id="idle-title">会话即将过期</div>
+        <div id="idle-message">
+            检测到您长时间未操作，<span id="idle-countdown">30</span> 秒后将自动退出登录。
+        </div>
+        <div id="idle-buttons">
+            <button id="idle-stay" class="btn btn-primary">继续会话</button>
+            <button id="idle-logout" class="btn btn-secondary">退出登录</button>
+        </div>
+    </div>
+</div>
+
+<main class="main" style="padding-top:40px">
+    <!--第一部分：汇总信息（按课程维度）-->
+    <section class="card">
+        <div class="card-title">
+            <span>汇总信息（按课程）</span>
+            <button id="refresh-summary" type="button">刷新</button>
+        </div>
+        <div class="filter-row">
+            <input type="checkbox" id="filter-no-selected">
+            <label for="filter-no-selected">筛选有人选的课程</label>
+            <button id="filter-course-button" type="button">筛选</button>
+        </div>
+        <table>
+            <thead>
+            <tr>
+                <th style="width:24%">课程名称</th>
+                <th style="width:76%">选课人姓名</th>
+            </tr>
+            </thead>
+            <tbody id="summaryBody"></tbody>
+        </table>
+    </section>
+
+    <!--第二部分：详细信息（按学生维度明细矩阵）-->
+    <section class="card" id="detailCard" style="margin-top:30px">
+        <div class="card-title">
+            <span>详细信息（按学生）</span>
+            <button id="refresh-detail" type="button">刷新</button>
+        </div>
+        <div class="filter-row">
+            <input type="checkbox" id="filter-unselected">
+            <label for="filter-unselected">筛选未选课的学生</label>
+            <button id="filter-student-button" type="button">筛选</button>
+        </div>
+        <table id="detailTable">
+            <thead id="detailHead"></thead>
+            <tbody id="detailBody"></tbody>
+        </table>
+    </section>
+</main>
+
+<script th:src="@{/heartbeat.js}"></script>
+<script>
+    // 后端接口（context-path /app_1 与前端 JS 约定一致）
+    const URL_SUMMARY = '/app_1/admin/course_select_result/get_summary';
+    const URL_DETAIL  = '/app_1/admin/course_select_result/get_detail';
+
+
+    let summary=[];
+    /* ================= 汇总信息表 ================= */
+    async function loadSummary() {
+        const resp = await fetch(URL_SUMMARY);
+        if (resp.status === 401) {
+            alert('登录过期，请返回登录界面。');
+            window.location.href = '/app_1/login';
+            return;
+        }
+        summary = await resp.json();
+        renderSummary();
+    }
+
+    function renderSummary() {
+        let onlyHaveSelected=document.getElementById('filter-no-selected').checked;
+        const rows=onlyHaveSelected
+            ? summary.filter(row => row.studentCount>0)
+            : summary;
+
+        document.getElementById('summaryBody').innerHTML = rows.map(row => `
+            <tr>
+                <td class="course-name">${row.courseName}</td>
+                <td class="course-name">
+                    ${row.studentNames ? row.studentNames : '—'}
+                    <div>共 ${row.studentCount} 人</div>
+                </td>
+            </tr>
+        `).join('');
+    }
+
+    /* ================= 详细信息矩阵 ================= */
+    let detail = { courses: [], students: [] };
+
+    function renderDetail() {
+        const onlyUnselected = document.getElementById('filter-unselected').checked;
+        const students = onlyUnselected
+            ? detail.students.filter(s => s.selectedCourseIds.length === 0)
+            : detail.students;
+
+        // 可能不开课（will_offer=false）的课程编号集合，这些列有特殊配色
+        const notOffered = new Set(detail.courses.filter(c => !c.will_offer).map(c => String(c.id)));
+
+        // 表头：姓名 + 每门课程一列；可能不开课的列表头浅绿色
+        document.getElementById('detailHead').innerHTML =
+            '<tr><th style="width:12%">姓名</th>' +
+            detail.courses.map(c =>
+                `<th class="${notOffered.has(String(c.id)) ? 'th-not-offered' : ''}">${c.name}</th>`
+            ).join('') +
+            '</tr>';
+
+        // 表格体：每个学生对每门课显示 选 / 不选；
+        // 确定开课的列用绿/红，可能不开课的列“选”橙色、“不选”黑色
+        document.getElementById('detailBody').innerHTML = students.map(s => {
+            const selected = new Set(s.selectedCourseIds.map(String));
+            return '<tr>' +
+                `<td>${s.studentName}</td>` +
+                detail.courses.map(c => {
+                    const chosen = selected.has(String(c.id));
+                    if (notOffered.has(String(c.id))) {
+                        return `<td class="${chosen ? 'choose' : 'skip'}">${chosen ? '选' : '不选'}</td>`;
+                    }
+                    return `<td class="${chosen ? 'yes' : 'no'}">${chosen ? '选' : '不选'}</td>`;
+                }).join('') +
+                '</tr>';
+        }).join('');
+    }
+
+    async function loadDetail() {
+        const resp = await fetch(URL_DETAIL);
+        if (resp.status === 401) {
+            alert('登录过期，请返回登录界面。');
+            window.location.href = '/app_1/login';
+            return;
+        }
+        detail = await resp.json();
+        renderDetail();
+    }
+
+    /* ================= 事件绑定 ================= */
+    document.getElementById('filter-course-button').addEventListener('click', renderSummary);
+    document.getElementById('filter-student-button').addEventListener('click', renderDetail);
+    document.getElementById('refresh-summary').addEventListener('click', loadSummary);
+    document.getElementById('refresh-detail').addEventListener('click', loadDetail);
+
+    (async function loadAll() {
+        try {
+            await loadSummary();
+            await loadDetail();
+        } catch (err) {
+            console.error('数据加载失败：', err);
+            alert('数据加载失败，请刷新重试。');
+        }
+    })();
+</script>
+</body>
+</html>

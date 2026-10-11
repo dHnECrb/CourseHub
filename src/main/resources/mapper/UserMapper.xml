@@ -4,6 +4,14 @@
 
 <mapper namespace="com.example.springdemo.mapper.UserMapper">
 
+    <select id="selectByPosition" resultType="com.example.springdemo.entity.User">
+        SELECT u.*
+        FROM `user` u
+        JOIN userPassword up ON up.id = u.id
+        WHERE up.position = #{position}
+        ORDER BY u.id
+    </select>
+
 <!--    <select id="findById" resultType="com.example.springdemo.entity.User" parameterType="Long">-->
 <!--        SELECT * FROM user WHERE id = #{id}-->
 <!--    </select>-->

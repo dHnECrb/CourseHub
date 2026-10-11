@@ -58,4 +58,18 @@
         </if>
     </select>
 
+    <select id="selectCourseSelectionSummary" resultType="com.example.springdemo.dto.CourseSelectionSummaryView">
+        SELECT
+            c.id   AS courseId,
+            c.name AS courseName,
+            GROUP_CONCAT(u.name ORDER BY u.id SEPARATOR '、') AS studentNames,
+            COUNT(u.id) AS studentCount
+        FROM course c
+        LEFT JOIN select_course sc ON sc.course_id = c.id
+        LEFT JOIN `user` u ON u.id = sc.user_id
+        WHERE c.term = #{term}
+        GROUP BY c.id, c.name
+        ORDER BY c.id
+    </select>
+
 </mapper>
