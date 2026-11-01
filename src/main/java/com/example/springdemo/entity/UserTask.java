@@ -40,6 +40,9 @@ public class UserTask {
         if(position.equals("all")){
             return true;
         }
+        if(this.position.equals("all")){
+            return true;
+        }
         return position.equals(this.position);
     }
 
