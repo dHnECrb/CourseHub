@@ -32,7 +32,7 @@ public class ScheduledTasksService {
 //            logger.info(msgSource.getMessage("logMessage.noStaleUsers",null,Locale.CHINA));
         }
         else {
-            logger.info(msgSource.getMessage("logMessage.logoutStaleUsersSuccess", new Object[]{deletedCount}, Locale.CHINA));
+            logger.info(msgSource.getMessage("logMessage.logoutStaleUsersSuccess", new Object[]{Integer.toString(deletedCount)}, Locale.CHINA));
         }
     }
 

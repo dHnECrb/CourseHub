@@ -57,7 +57,7 @@ public class LoginController {
 //            System.out.println("第"+loginCount+"个人次登录");
             modelAndView.addObject("msg",
                     msgSource.getMessage("responseMessage.loginCount",
-                            new Object[]{LoginCounter.getTotalCount()},
+                            new Object[]{Integer.toString(LoginCounter.getTotalCount())},
                             locale));
             return modelAndView;
         }

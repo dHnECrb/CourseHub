@@ -115,10 +115,10 @@ public class UserManageService {
         }
         BasicFunctions.printTimeHttpSessionAnd(httpSession, adminId,
                 msgSource.getMessage("logMessage.createUsers",
-                        new Object[]{toCreate.size()}, Locale.CHINA));
+                        new Object[]{Integer.toString(toCreate.size())}, Locale.CHINA));
         return new RequestResult(true, 200,
                 msgSource.getMessage("responseMessage.createUserSuccess",
-                        new Object[]{toCreate.size()}, locale));
+                        new Object[]{Integer.toString(toCreate.size())}, locale));
     }
 
     /**管理员重置指定用户的密码：新密码留空则重置为该用户的 id。重新生成盐并计算哈希。
@@ -137,12 +137,13 @@ public class UserManageService {
 
         UserPassword userPassword = userPasswordMapper.selectById(userId);
         if (userPassword == null) {
+            // 消息模板经 MessageFormat 处理，数字参数需转成字符串，否则会被加上千分位逗号
             BasicFunctions.printTimeHttpSessionAnd(httpSession, adminId,
                     msgSource.getMessage("logMessage.resetPasswordUserNotFound",
-                            new Object[]{userId}, Locale.CHINA));
+                            new Object[]{userId.toString()}, Locale.CHINA));
             return new RequestResult(false, 404,
                     msgSource.getMessage("responseMessage.userIdNotFoundForReset",
-                            new Object[]{userId}, locale));
+                            new Object[]{userId.toString()}, locale));
         }
 
         String password = emptyToNull(newPassword);
@@ -161,7 +162,7 @@ public class UserManageService {
 
         BasicFunctions.printTimeHttpSessionAnd(httpSession, adminId,
                 msgSource.getMessage("logMessage.resetPassword",
-                        new Object[]{userId}, Locale.CHINA));
+                        new Object[]{userId.toString()}, Locale.CHINA));
         return new RequestResult(true, 200,
                 msgSource.getMessage("responseMessage.passwordReset", null, locale));
     }
