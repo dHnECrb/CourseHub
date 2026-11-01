@@ -83,6 +83,7 @@ public class UserLoginService {
             user1Id=userToLogin.getId();
             user2Id=(String)httpSession.getAttribute("userId");
             if(user1Id.equals(user2Id)){
+                user2Id=null;
                 log= msgSource.getMessage("logMessage.loginAgain", null, Locale.CHINA);
             }
             else{
@@ -104,6 +105,9 @@ public class UserLoginService {
             userPassword=this.getUser(inputtedUserId);
             if (userPassword==null) {
                 result=false;
+                // 对不存在的账号也执行相同的慢哈希，避免通过响应时间判断账号是否存在
+                String inputtedPassword = userToLogin.getPassword() == null ? "" : userToLogin.getPassword();
+                BasicFunctions.hashPassword(inputtedPassword, "nonexistentUser!");
                 // 即使知道是用户不存在，也要返回“账号或密码错误”，防止暴力破解
                 reasonHint= msgSource.getMessage("responseMessage.nameOrPasswordWrong", null, frontLocale);
                 user1Id=userToLogin.getId();
@@ -128,6 +132,7 @@ public class UserLoginService {
                     else{
                         throw new IllegalArgumentException("未知的用户类型: "+position);
                     }
+                    user1Id=userToLogin.getId();
                     log=msgSource.getMessage("logMessage.loginSucceed", null, Locale.CHINA);
                 } else {
                     result=false;
