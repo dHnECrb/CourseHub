@@ -49,9 +49,9 @@
                 <th>序号</th>
                 <th>名称</th>
                 <th>详细信息</th>
+                <th>入口</th>
                 <th>开始时间</th>
                 <th>结束时间</th>
-                <th>地址</th>
             </tr>
             </thead>
 
@@ -90,9 +90,9 @@
                             `<td>${index + 1}</td>` +
                             `<td>${task.name}</td>` +
                             `<td>${comment}</td>` +
+                            `<td><a href="/app_1${task.site}">进入</a></td>`+
                             `<td>${formatTime(task.start_time)}</td>` +
-                            `<td>${formatTime(task.deadline_time)}</td>` +
-                            `<td><a href="/app_1${task.site}">进入 ${task.name}</a></td>`;
+                            `<td>${formatTime(task.deadline_time)}</td>`;
                         tbody.appendChild(tr);
                     });
                 })
