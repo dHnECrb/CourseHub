@@ -55,6 +55,84 @@
             cursor:pointer;
         }
         td button.remove-button:hover{background:#f1f5f9}
+        /*隐藏原生文件选择框，用自定义按钮代替*/
+        .hidden-file-input{
+            position:absolute;
+            width:1px;
+            height:1px;
+            opacity:0;
+            overflow:hidden;
+        }
+        .select-button{
+            display:inline-block;
+            padding:6px 22px;
+            font-size:14px;
+            border:1px solid #64748b;
+            border-radius:8px;
+            background:#fff;
+            cursor:pointer;
+        }
+        .select-button:hover{background:#f1f5f9}
+        /*自定义下拉列表样式*/
+        .select-wrapper{position:relative;display:inline-block}
+        .select-wrapper select{
+            appearance:none;
+            -webkit-appearance:none;
+            padding:6px 30px 6px 10px;
+            font-size:14px;
+            border:1px solid #94a3b8;
+            border-radius:6px;
+            background:#fff;
+            cursor:pointer;
+        }
+        .select-wrapper::after{
+            content:'▼';
+            position:absolute;
+            right:10px;
+            top:50%;
+            transform:translateY(-50%);
+            font-size:10px;
+            color:#64748b;
+            pointer-events:none;
+        }
+        /*待提交表格：页面向下滚动时表头固定在页面顶部。
+          注意：表头祖先不能有 overflow 滚动容器（卡片 overflow:hidden 也不行），
+          否则吸顶相对的是容器而不是窗口，所以卡片单独放开裁剪*/
+        #pendingCard{overflow:visible}
+        #pendingTable thead th{
+            position:sticky;
+            top:0;
+            z-index:10;
+        }
+        /*分页行*/
+        .page-row{
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            gap:12px;
+            padding:12px 18px;
+            border-top:1px solid var(--line);
+            background:#f8fafc;
+            font-size:14px;
+        }
+        .page-row input[type="number"]{
+            width:70px;
+            padding:5px 8px;
+            font-size:14px;
+            border:1px solid #94a3b8;
+            border-radius:6px;
+        }
+        .page-row button{
+            padding:5px 18px;
+            font-size:14px;
+            border:1px solid #64748b;
+            border-radius:8px;
+            background:#fff;
+            cursor:pointer;
+        }
+        .page-row button:hover{background:#f1f5f9}
+        .page-row button:disabled{opacity:.45;cursor:not-allowed}
+        #page-info{min-width:150px;text-align:center}
     </style>
 </head>
 <body>
@@ -91,11 +169,13 @@
         </div>
         <div class="control-row">
             <label for="single-position">身份：</label>
-            <select id="single-position">
-                <option value="student" selected>学生</option>
-                <option value="teacher">教师</option>
-                <option value="admin">管理员</option>
-            </select>
+            <span class="select-wrapper">
+                <select id="single-position">
+                    <option value="student" selected>学生</option>
+                    <option value="teacher">教师</option>
+                    <option value="admin">管理员</option>
+                </select>
+            </span>
             <label for="single-password">初始密码：</label>
             <input type="text" id="single-password">
             <span class="hint">留空则与账号id相同</span>
@@ -107,19 +187,21 @@
     <section class="card" style="margin-top:30px">
         <div class="card-title">批量导入（CSV）</div>
         <div class="control-row">
-            <input type="file" id="csv-file" accept=".csv,text/csv">
+            <input type="file" id="csv-file" class="hidden-file-input" accept=".csv,text/csv">
+            <label class="select-button" for="csv-file">选择文件</label>
+            <span id="csv-file-name" class="hint">未选择文件</span>
             <button type="button" id="csv-import-button">导入</button>
             <span class="hint">格式：id,name,age,email,position,password（首行表头可省略，留空字段用逗号占位）</span>
         </div>
     </section>
 
     <!--第三部分：待提交用户列表（管理员检查无误后点击提交）-->
-    <section class="card" style="margin-top:30px">
+    <section class="card" id="pendingCard" style="margin-top:30px">
         <div class="card-title">
             <span>待提交用户（<span id="pending-count">0</span> 个）</span>
             <button type="button" id="submit-button">提交</button>
         </div>
-        <table>
+        <table id="pendingTable">
             <thead>
             <tr>
                 <th style="width:7%">序号</th>
@@ -134,6 +216,13 @@
             </thead>
             <tbody id="pending-body"></tbody>
         </table>
+        <div class="page-row">
+            <label for="page-size">每页行数：</label>
+            <input type="number" id="page-size" min="1" max="100" value="20">
+            <button type="button" id="prev-page-button">上一页</button>
+            <span id="page-info">第 1 / 1 页（共 0 个）</span>
+            <button type="button" id="next-page-button">下一页</button>
+        </div>
         <div class="msg-error" id="pending-msg" style="padding:0 18px 12px"></div>
     </section>
 
@@ -159,6 +248,17 @@
 
     // 待提交的用户列表（单个添加与 CSV 导入都加入这里）
     let pendingUsers = [];
+    // 分页状态：默认每页 20 行，可在页面上修改（最多 100）
+    let currentPage = 1;
+
+    /**读取每页行数（输入非法时回落到 20，超过 100 按 100 处理）*/
+    function getPageSize() {
+        let size = parseInt(document.getElementById('page-size').value, 10);
+        if (!Number.isInteger(size) || size < 1) {
+            size = 20;
+        }
+        return Math.min(size, 100);
+    }
 
     function handleUnauthorized(resp) {
         if (resp.status === 401) {
@@ -178,19 +278,31 @@
     }
 
     function renderPending() {
-        document.getElementById('pending-body').innerHTML = pendingUsers.map((user, index) => `
+        const pageSize = getPageSize();
+        const pageCount = Math.max(1, Math.ceil(pendingUsers.length / pageSize));
+        if (currentPage > pageCount) {
+            currentPage = pageCount;
+        }
+        const start = (currentPage - 1) * pageSize;
+        const pageUsers = pendingUsers.slice(start, start + pageSize);
+
+        document.getElementById('pending-body').innerHTML = pageUsers.map((user, index) => `
             <tr>
-                <td>${index + 1}</td>
+                <td>${start + index + 1}</td>
                 <td>${user.id}</td>
                 <td>${user.name ? user.name : '—'}</td>
                 <td>${user.age !== null && user.age !== undefined ? user.age : '—'}</td>
                 <td>${user.email ? user.email : '—'}</td>
                 <td>${user.position ? user.position : 'student'}</td>
                 <td>${user.password ? user.password : '（同id）'}</td>
-                <td><button type="button" class="remove-button" data-index="${index}">删除</button></td>
+                <td><button type="button" class="remove-button" data-index="${start + index}">删除</button></td>
             </tr>
         `).join('');
         document.getElementById('pending-count').textContent = pendingUsers.length;
+        document.getElementById('page-info').textContent =
+            `第 ${currentPage} / ${pageCount} 页（共 ${pendingUsers.length} 个）`;
+        document.getElementById('prev-page-button').disabled = currentPage <= 1;
+        document.getElementById('next-page-button').disabled = currentPage >= pageCount;
         document.querySelectorAll('.remove-button').forEach(button => {
             button.addEventListener('click', function () {
                 pendingUsers.splice(Number(this.dataset.index), 1);
@@ -203,7 +315,7 @@
     function addPendingUser(user) {
         const id = emptyToNull(String(user.id));
         if (id === null) {
-            return '账号id不能为空。';
+            return '账号id不能为空';
         }
         if (!isPositiveIntegerString(id)) {
             return '账号id必须是数字：' + id;
@@ -247,15 +359,21 @@
         }
     }
 
-    /**解析 CSV 文本：按行、按逗号拆分，支持首行表头*/
+    /**解析 CSV 文本：按行、按逗号拆分，支持首行表头。
+     * 返回 {lineNumber, cells} 列表，lineNumber 为原始文件中的行号（从 1 开始，含空行），便于错误定位*/
     function parseCsv(text) {
-        const lines = text.split(/\r\n|\r|\n/).filter(line => line.trim() !== '');
-        if (lines.length === 0) {
+        const rows = [];
+        text.split(/\r\n|\r|\n/).forEach((line, index) => {
+            if (line.trim() === '') {
+                return;
+            }
+            rows.push({lineNumber: index + 1, cells: line.split(',').map(cell => cell.trim())});
+        });
+        if (rows.length === 0) {
             return [];
         }
-        const rows = lines.map(line => line.split(',').map(cell => cell.trim()));
         // 首行表头：第一个单元格不是数字时认为是表头，跳过
-        if (!isPositiveIntegerString(rows[0][0])) {
+        if (!isPositiveIntegerString(rows[0].cells[0])) {
             rows.shift();
         }
         return rows;
@@ -271,20 +389,20 @@
         const reader = new FileReader();
         reader.onload = function () {
             const errors = [];
-            for (const cells of parseCsv(String(reader.result))) {
+            for (const row of parseCsv(String(reader.result))) {
                 const error = addPendingUser({
-                    id: cells[0],
-                    name: cells[1],
-                    age: cells[2],
-                    email: cells[3],
-                    position: cells[4],
-                    password: cells[5]
+                    id: row.cells[0],
+                    name: row.cells[1],
+                    age: row.cells[2],
+                    email: row.cells[3],
+                    position: row.cells[4],
+                    password: row.cells[5]
                 });
                 if (error) {
-                    errors.push(error);
+                    errors.push('第' + row.lineNumber + '行：' + error);
                 }
             }
-            msgElement.textContent = errors.join('；');
+            msgElement.innerText = errors.join('\n');
             renderPending();
         };
         reader.readAsText(file, 'UTF-8');
@@ -379,6 +497,29 @@
     document.getElementById('csv-import-button').addEventListener('click', importCsv);
     document.getElementById('submit-button').addEventListener('click', submitUsers);
     document.getElementById('reset-button').addEventListener('click', resetPassword);
+
+    // 选择文件后显示文件名
+    document.getElementById('csv-file').addEventListener('change', function () {
+        document.getElementById('csv-file-name').textContent =
+            this.files.length > 0 ? this.files[0].name : '未选择文件';
+    });
+
+    // 分页控制：修改每页行数后回到第一页；上一页/下一页切换
+    document.getElementById('page-size').addEventListener('change', function () {
+        currentPage = 1;
+        renderPending();
+    });
+    document.getElementById('prev-page-button').addEventListener('click', function () {
+        if (currentPage > 1) {
+            currentPage--;
+            renderPending();
+        }
+    });
+    document.getElementById('next-page-button').addEventListener('click', function () {
+        currentPage++;
+        renderPending();
+    });
+
     renderPending();
 </script>
 </body>
