@@ -209,6 +209,9 @@
             alert('限制数量必须是不小于0的整数（0 表示不限制）。');
             return;
         }
+        // 防止用户多次点击：请求发出后立即禁用按钮，结束后恢复
+        const setLimitsButton = document.getElementById('set-limits-button');
+        setLimitsButton.disabled = true;
         try {
             const resp = await fetch(URL_SET_LIMITS, {
                 method: 'POST',
@@ -225,6 +228,8 @@
         } catch (err) {
             console.error('限制数量设置失败：', err);
             alert('设置失败，请重试。');
+        } finally {
+            setLimitsButton.disabled = false;
         }
     }
 

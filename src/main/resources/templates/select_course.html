@@ -461,6 +461,9 @@
         const toSelect = [...checked].filter(id => !initialChosen.has(id));
         const toCancel = [...initialChosen].filter(id => !checked.has(id));
 
+        // 防止用户多次点击：请求发出后立即禁用按钮，结束后恢复
+        const submitButton = document.getElementById('submit-button');
+        submitButton.disabled = true;
         try {
             const resp = await fetch(URL_SUBMIT, {
                 method: 'POST',
@@ -479,6 +482,8 @@
         } catch (err) {
             console.error('提交失败：', err);
             alert('网络错误，提交失败。');
+        } finally {
+            submitButton.disabled = false;
         }
     }
 

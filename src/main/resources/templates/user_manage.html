@@ -297,6 +297,9 @@
             return;
         }
         msgElement.textContent = '';
+        // 防止用户多次点击：请求发出后立即禁用按钮，结束后恢复
+        const submitButton = document.getElementById('submit-button');
+        submitButton.disabled = true;
         try {
             const resp = await fetch(URL_CREATE, {
                 method: 'POST',
@@ -319,7 +322,9 @@
             }
         } catch (err) {
             console.error('创建用户请求失败：', err);
-            msgElement.textContent = '请求失败，请重试。';
+            msgElement.innerText = '请求失败，请重试。';
+        } finally {
+            submitButton.disabled = false;
         }
     }
 
@@ -341,6 +346,9 @@
             return;
         }
         msgElement.textContent = '';
+        // 防止用户多次点击：请求发出后立即禁用按钮，结束后恢复
+        const resetButton = document.getElementById('reset-button');
+        resetButton.disabled = true;
         try {
             const resp = await fetch(URL_RESET, {
                 method: 'POST',
@@ -362,6 +370,8 @@
         } catch (err) {
             console.error('重置密码请求失败：', err);
             msgElement.textContent = '请求失败，请重试。';
+        } finally {
+            resetButton.disabled = false;
         }
     }
 
