@@ -135,6 +135,21 @@ public class UserLoginService {
             }
         }
 
+        if(result) {
+            int canLoginCode = onlineUserManager.checkCanLogin(userToLogin.getId(), httpSession);
+            if (canLoginCode == OnlineUserManager.LOGIN_DENIED_BY_USER_COUNT) {
+                result=false;
+                user1Id=userToLogin.getId();
+                log= msgSource.getMessage("logMessage.loginFailUserCountLimit", null, Locale.CHINA);
+                reasonHint= msgSource.getMessage("responseMessage.onlineUserCountLimitReached", null, frontLocale);
+            }
+            else if (canLoginCode == OnlineUserManager.LOGIN_DENIED_BY_SESSION_COUNT) {
+                result=false;
+                user1Id=userToLogin.getId();
+                log= msgSource.getMessage("logMessage.loginFailSessionCountLimit", null, Locale.CHINA);
+                reasonHint= msgSource.getMessage("responseMessage.onlineUserSessionCountLimitReached", null, frontLocale);
+            }
+        }
         if(user1Id!=null && user2Id!=null){
             BasicFunctions.printTimeHttpSessionAnd(httpSession, user1Id, user2Id,log);
         }

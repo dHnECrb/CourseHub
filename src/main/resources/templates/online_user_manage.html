@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>在线用户管理</title>
+    <link rel="icon" th:href="@{/favicon.ico}" type="image/x-icon">
+    <link th:href="@{/select_course_style.css}" rel="stylesheet" type="text/css">
+    <link th:href="@{/idle_mask.css}" rel="stylesheet" type="text/css">
+    <style>
+        .main{padding-top:40px}
+        /*统计数字卡片*/
+        .stat-row{
+            display:flex;
+            justify-content:center;
+            gap:40px;
+            padding:22px 18px;
+        }
+        .stat-box{
+            width:200px;
+            padding:18px 10px;
+            border:1px solid var(--line);
+            border-radius:12px;
+            box-shadow:var(--shadow);
+            background:#fff;
+            text-align:center;
+        }
+        .stat-box .stat-label{font-size:16px;font-weight:700}
+        .stat-box .stat-value{font-size:34px;font-weight:700;color:#0e7490;margin-top:8px}
+        /*顶部控制行（自动更新）与限制行共用*/
+        .control-row{
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            gap:14px;
+            flex-wrap:wrap;
+            padding:14px 18px;
+            border-bottom:1px solid var(--line);
+            background:#f8fafc;
+            font-size:15px;
+        }
+        .control-row input[type="number"]{
+            width:90px;
+            padding:6px 8px;
+            font-size:14px;
+            border:1px solid #94a3b8;
+            border-radius:6px;
+        }
+        .control-row button{
+            padding:6px 22px;
+            font-size:14px;
+            border:1px solid #64748b;
+            border-radius:8px;
+            background:#fff;
+            cursor:pointer;
+        }
+        .control-row button:hover{background:#f1f5f9}
+        #load-button{margin-left:auto}
+    </style>
+</head>
+<body>
+
+<!--返回上一级：固定于左上角，不随滚动移动-->
+<button id="back-button" type="button" onclick="history.back()">← 返回上一级</button>
+
+<!--会话过期的遮罩（heartbeat.js 依赖此结构）-->
+<div id="idle-mask" style="display:none;">
+    <div id="idle-dialog" role="alertdialog" aria-modal="true">
+        <div id="idle-title">会话即将过期</div>
+        <div id="idle-message">
+            检测到您长时间未操作，<span id="idle-countdown">30</span> 秒后将自动退出登录。
+        </div>
+        <div id="idle-buttons">
+            <button id="idle-stay" class="btn btn-primary">继续会话</button>
+            <button id="idle-logout" class="btn btn-secondary">退出登录</button>
+        </div>
+    </div>
+</div>
+
+<main class="main">
+    <!--第一部分：在线数量统计（可自动/手动更新）-->
+    <section class="card">
+        <div class="control-row">
+            <input type="checkbox" id="auto-update">
+            <label for="auto-update">自动更新</label>
+            <label for="update-interval">更新间隔：</label>
+            <input type="number" id="update-interval" min="1" value="5">
+            <span>秒</span>
+            <button id="refresh-now-button" type="button">立即更新</button>
+        </div>
+        <div class="stat-row">
+            <div class="stat-box">
+                <div class="stat-label">在线会话数量</div>
+                <div class="stat-value" id="online-session-count">—</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">在线用户数量</div>
+                <div class="stat-value" id="online-user-count">—</div>
+            </div>
+        </div>
+    </section>
+
+    <!--第二部分：数量限制设置-->
+    <section class="card" style="margin-top:30px">
+        <div class="control-row">
+            <label for="max-online-user-count">限制用户数量：</label>
+            <input type="number" id="max-online-user-count" min="0">
+            <label for="max-session-count-per-user">限制用户的会话数量：</label>
+            <input type="number" id="max-session-count-per-user" min="0">
+            <button id="set-limits-button" type="button">确定</button>
+        </div>
+    </section>
+
+    <!--第三部分：在线用户表格（进入页面不自动加载，需点击“加载”）-->
+    <section class="card" style="margin-top:30px">
+        <div class="control-row">
+            <input type="checkbox" id="filter-multi-session">
+            <label for="filter-multi-session">筛选会话数大于1的用户</label>
+            <button id="filter-button" type="button">筛选</button>
+            <button id="load-button" type="button">加载</button>
+        </div>
+        <table>
+            <thead>
+            <tr>
+                <th style="width:10%">序号</th>
+                <th style="width:22%">账号</th>
+                <th style="width:22%">姓名</th>
+                <th style="width:16%">会话数</th>
+                <th style="width:30%">最近活跃时间</th>
+            </tr>
+            </thead>
+            <tbody id="userBody"></tbody>
+        </table>
+    </section>
+</main>
+
+<script th:src="@{/heartbeat.js}"></script>
+<script>
+    // 后端接口（context-path /app_1 与前端 JS 约定一致）
+    const URL_COUNTS = '/app_1/admin/online_user_manage/get_counts';
+    const URL_LIMITS = '/app_1/admin/online_user_manage/get_limits';
+    const URL_SET_LIMITS = '/app_1/admin/online_user_manage/set_limits';
+    const URL_USERS = '/app_1/admin/online_user_manage/get_users';
+
+    /* ================= 在线数量统计（自动/手动更新） ================= */
+    let autoUpdateTimer = null;
+
+    function handleUnauthorized(resp) {
+        if (resp.status === 401) {
+            alert('登录过期，请返回登录界面。');
+            window.location.href = '/app_1/login';
+            return true;
+        }
+        return false;
+    }
+
+    async function loadCounts() {
+        try {
+            const resp = await fetch(URL_COUNTS);
+            if (handleUnauthorized(resp)) return;
+            if (!resp.ok) return;
+            const counts = await resp.json();
+            if (!counts) return;
+            document.getElementById('online-user-count').textContent = counts.onlineUserCount;
+            document.getElementById('online-session-count').textContent = counts.onlineSessionCount;
+        } catch (err) {
+            console.error('在线数量加载失败：', err);
+        }
+    }
+
+    function stopAutoUpdate() {
+        if (autoUpdateTimer !== null) {
+            clearInterval(autoUpdateTimer);
+            autoUpdateTimer = null;
+        }
+    }
+
+    function startAutoUpdate() {
+        stopAutoUpdate();
+        const seconds = parseInt(document.getElementById('update-interval').value, 10);
+        if (!Number.isFinite(seconds) || seconds < 1) {
+            alert('更新间隔必须是大于等于1的整数秒。');
+            document.getElementById('auto-update').checked = false;
+            return;
+        }
+        autoUpdateTimer = setInterval(loadCounts, seconds * 1000);
+    }
+
+    /* ================= 数量限制设置（进入页面自动加载当前数值） ================= */
+    async function loadLimits() {
+        try {
+            const resp = await fetch(URL_LIMITS);
+            if (handleUnauthorized(resp)) return;
+            if (!resp.ok) return;
+            const limits = await resp.json();
+            if (!limits) return;
+            document.getElementById('max-online-user-count').value = limits.maxOnlineUserCount;
+            document.getElementById('max-session-count-per-user').value = limits.maxSessionCountPerUser;
+        } catch (err) {
+            console.error('限制数量加载失败：', err);
+        }
+    }
+
+    async function setLimits() {
+        const maxOnlineUserCount = parseInt(document.getElementById('max-online-user-count').value, 10);
+        const maxSessionCountPerUser = parseInt(document.getElementById('max-session-count-per-user').value, 10);
+        if (!Number.isFinite(maxOnlineUserCount) || maxOnlineUserCount < 0
+            || !Number.isFinite(maxSessionCountPerUser) || maxSessionCountPerUser < 0) {
+            alert('限制数量必须是不小于0的整数（0 表示不限制）。');
+            return;
+        }
+        try {
+            const resp = await fetch(URL_SET_LIMITS, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: new URLSearchParams({ maxOnlineUserCount, maxSessionCountPerUser })
+            });
+            if (handleUnauthorized(resp)) return;
+            const result = await resp.json();
+            if (result && result.isSucceed) {
+                alert('设置成功。');
+            } else {
+                alert((result && result.string) ? result.string : '设置失败。');
+            }
+        } catch (err) {
+            console.error('限制数量设置失败：', err);
+            alert('设置失败，请重试。');
+        }
+    }
+
+    /* ================= 在线用户表格（点击“加载”才请求数据） ================= */
+    let users = [];
+
+    function formatTime(timestamp) {
+        if (!timestamp) return '—';
+        const date = new Date(timestamp);
+        const pad = n => String(n).padStart(2, '0');
+        return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} `
+            + `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+    }
+
+    function renderUsers() {
+        const onlyMultiSession = document.getElementById('filter-multi-session').checked;
+        const rows = onlyMultiSession
+            ? users.filter(user => user.sessionCount > 1)
+            : users;
+
+        document.getElementById('userBody').innerHTML = rows.map((user, index) => `
+            <tr>
+                <td>${index + 1}</td>
+                <td>${user.account}</td>
+                <td>${user.name ? user.name : '—'}</td>
+                <td>${user.sessionCount}</td>
+                <td>${formatTime(user.lastActiveTime)}</td>
+            </tr>
+        `).join('');
+    }
+
+    async function loadUsers() {
+        try {
+            const resp = await fetch(URL_USERS);
+            if (handleUnauthorized(resp)) return;
+            if (!resp.ok) return;
+            users = await resp.json();
+            renderUsers();
+        } catch (err) {
+            console.error('在线用户加载失败：', err);
+            alert('加载失败，请重试。');
+        }
+    }
+
+    /* ================= 事件绑定 ================= */
+    document.getElementById('refresh-now-button').addEventListener('click', loadCounts);
+    document.getElementById('auto-update').addEventListener('change', function () {
+        if (this.checked) {
+            startAutoUpdate();
+        } else {
+            stopAutoUpdate();
+        }
+    });
+    document.getElementById('set-limits-button').addEventListener('click', setLimits);
+    document.getElementById('load-button').addEventListener('click', loadUsers);
+    document.getElementById('filter-button').addEventListener('click', renderUsers);
+
+    (async function init() {
+        await loadCounts();
+        await loadLimits();
+    })();
+</script>
+</body>
+</html>
