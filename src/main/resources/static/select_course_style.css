@@ -16,8 +16,10 @@
 *{box-sizing:border-box}
 body{
     margin:0;
+    min-height:100vh;
     font-family:"Microsoft YaHei","PingFang SC",system-ui,sans-serif;
-    background:var(--bg);
+    background:linear-gradient(135deg,#6f91b4 0%,#9ab7ca 45%,#6f9f96 100%);
+    background-attachment:fixed;
     color:var(--text);
 }
 .fixed-header{
@@ -27,7 +29,7 @@ body{
     right:0;
     z-index:1000;
     padding:14px 18px 12px;
-    background:rgba(244,247,251,.96);
+    background:transparent;
     backdrop-filter:blur(8px);
     box-shadow:0 4px 14px rgba(15,23,42,.08);
 }
