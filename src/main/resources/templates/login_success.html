@@ -11,8 +11,26 @@
     <div id="login-div">
         <h1>登录成功！</h1>
         <p th:text="${msg}"></p>
-        <button type="button" onclick="window.location.href='/app_1/main'" id="login-button">进&nbsp;&nbsp;&nbsp;&nbsp;入</button>
+        <button type="button" onclick="enterMain()" id="login-button">进&nbsp;&nbsp;入(<span id="countdown">3</span> s)</button>
     </div>
 </div>
+<script>
+    let remainingSeconds = 3;
+    const countdownElement = document.getElementById('countdown');
+
+    function enterMain() {
+        window.location.href = '/app_1/main';
+    }
+
+    const countdownTimer = setInterval(() => {
+        remainingSeconds--;
+        if (remainingSeconds > 0) {
+            countdownElement.textContent = remainingSeconds;
+        } else {
+            clearInterval(countdownTimer);
+            enterMain();
+        }
+    }, 1000);
+</script>
 </body>
 </html>

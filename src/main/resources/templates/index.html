@@ -1,23 +1,65 @@
 <!DOCTYPE html>
-<html lang="zh-cn">
+<html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <title>登录</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#eff6ff">
+    <title>登录系统</title>
     <link rel="icon" th:href="@{/favicon.ico}" type="image/x-icon">
     <link th:href="@{/style.css}" rel="stylesheet" type="text/css">
-    <script th:src="@{/script1.js}"></script>
+    <script th:src="@{/script1.js}" defer></script>
 </head>
-<body>
-    <div class="main-div">
-        <div id="login-div">
-            <h1>登录界面</h1>
-            <form id="login-form" action="/app_1/login" method="post">
-                账号：<input type="text" name="id" id="id" autocomplete="username" placeholder="在这里输入账号" th:value="${userId}"><br>
-                密码：<input type="password" name="password" id="password" autocomplete="current-password" placeholder="在这里输入密码"><br>
-            </form>
-            <button type="button" onclick="login()" id="login-button">登&nbsp;&nbsp;&nbsp;&nbsp;录</button>
-            <p th:text="${msg}" id="msg"></p>
+<body class="login-page">
+<div class="background-shape background-shape-one" aria-hidden="true"></div>
+<div class="background-shape background-shape-two" aria-hidden="true"></div>
+
+<main class="main-div">
+    <section class="login-card" aria-label="系统登录">
+        <div class="intro-panel">
+
         </div>
-    </div>
+
+        <div id="login-div">
+            <div class="login-heading">
+                <p class="welcome-label">WELCOME</p>
+                <h2>欢迎</h2>
+                <p>请使用您的账号登录系统</p>
+            </div>
+
+            <form id="login-form" th:action="@{/login}" method="post">
+                <div class="form-field">
+                    <label for="id">账号</label>
+                    <div class="input-wrap">
+                        <svg class="input-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                            <circle cx="12" cy="8" r="3.5" stroke="currentColor" stroke-width="1.8"/>
+                            <path d="M5 20c.5-4 3-6 7-6s6.5 2 7 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                        </svg>
+                        <input type="text" name="id" id="id" autocomplete="username" placeholder="请输入账号" th:value="${userId}" autocapitalize="none" spellcheck="false">
+                    </div>
+                </div>
+
+                <div class="form-field">
+                    <label for="password">密码</label>
+                    <div class="input-wrap">
+                        <svg class="input-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                            <rect x="5" y="10" width="14" height="10" rx="3" stroke="currentColor" stroke-width="1.8"/>
+                            <path d="M8 10V7a4 4 0 0 1 8 0v3M12 14v2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                        </svg>
+                        <input type="password" name="password" id="password" autocomplete="current-password" placeholder="请输入密码">
+                    </div>
+                </div>
+            </form>
+
+            <p th:text="${msg}" id="msg" role="alert" aria-live="polite"></p>
+            <button type="button" onclick="login()" id="login-button">
+                <span>登 录</span>
+                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <path d="M5 12h14m-5-5 5 5-5 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </button>
+            <p class="login-tip">若忘记密码，请与系统管理员联系。</p>
+        </div>
+    </section>
+</main>
 </body>
 </html>
