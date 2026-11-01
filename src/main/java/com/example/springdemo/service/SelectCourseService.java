@@ -9,6 +9,7 @@ import com.example.springdemo.entity.CourseSelect;
 import com.example.springdemo.entity.YearTerm;
 import com.example.springdemo.mapper.CourseMapper;
 import com.example.springdemo.mapper.CourseSelectMapper;
+import com.example.springdemo.util.BasicFunctions;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpSession;
 import org.jspecify.annotations.NonNull;
@@ -92,6 +93,7 @@ public class SelectCourseService {
                     .in(CourseSelect::getCourse_id, canceledCourseIdList);
             courseSelectMapper.delete(wrapper);
         }
+        BasicFunctions.printTimeHttpSessionAnd(httpSession, userId.toString(), "增加课程"+selectedCourseIdList+"删除课程"+canceledCourseIdList);
         return new RequestResult(true, 200, null);
     }
 

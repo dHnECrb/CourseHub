@@ -56,10 +56,10 @@ public class UserMainService {
         boolean isSucceed;
         if(BasicFunctions.isLoggedIn(httpSession)){
             isSucceed=onlineUserManager.heartbeat(httpSession, lastActiveTime);
-            BasicFunctions.printTimeHttpSessionAnd(httpSession, (String)httpSession.getAttribute("userId"),
-                    "心跳\t"+ Instant.ofEpochMilli(lastActiveTime)
-                            .atZone(ZoneId.systemDefault())
-                            .toLocalDateTime());
+//            BasicFunctions.printTimeHttpSessionAnd(httpSession, (String)httpSession.getAttribute("userId"),
+//                    "心跳\t"+ Instant.ofEpochMilli(lastActiveTime)
+//                            .atZone(ZoneId.systemDefault())
+//                            .toLocalDateTime());
             return new RequestResult(isSucceed, 200, null);
         }
         else{

@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>用户管理</title>
+    <link rel="icon" th:href="@{/favicon.ico}" type="image/x-icon">
+    <link th:href="@{/select_course_style.css}" rel="stylesheet" type="text/css">
+    <link th:href="@{/idle_mask.css}" rel="stylesheet" type="text/css">
+    <style>
+        .main{max-width:1220px;margin:0 auto;padding:60px 18px 50px}
+        .control-row{
+            display:flex;
+            align-items:center;
+            gap:10px;
+            flex-wrap:wrap;
+            padding:14px 18px;
+            border-bottom:1px solid var(--line);
+            background:#f8fafc;
+            font-size:14px;
+        }
+        .control-row label{white-space:nowrap}
+        .control-row input[type="text"], .control-row input[type="number"], .control-row input[type="password"]{
+            width:150px;
+            padding:6px 8px;
+            font-size:14px;
+            border:1px solid #94a3b8;
+            border-radius:6px;
+        }
+        .control-row input.narrow{width:110px}
+        .control-row select{
+            padding:6px 8px;
+            font-size:14px;
+            border:1px solid #94a3b8;
+            border-radius:6px;
+        }
+        .control-row button{
+            padding:6px 22px;
+            font-size:14px;
+            border:1px solid #64748b;
+            border-radius:8px;
+            background:#fff;
+            cursor:pointer;
+        }
+        .control-row button:hover{background:#f1f5f9}
+        .hint{color:var(--muted);font-size:13px}
+        .msg-error{color:#b91c1c;font-size:13px;min-height:18px;margin-top:6px}
+        #pending-count{font-weight:700;color:#0e7490}
+        td button.remove-button{
+            padding:3px 12px;
+            font-size:13px;
+            border:1px solid var(--line);
+            border-radius:6px;
+            background:#fff;
+            cursor:pointer;
+        }
+        td button.remove-button:hover{background:#f1f5f9}
+    </style>
+</head>
+<body>
+
+<button id="back-button" type="button" onclick="history.back()">← 返回上一级</button>
+
+<!--会话过期的遮罩（heartbeat.js 依赖此结构）-->
+<div id="idle-mask" style="display:none;">
+    <div id="idle-dialog" role="alertdialog" aria-modal="true">
+        <div id="idle-title">会话即将过期</div>
+        <div id="idle-message">
+            检测到您长时间未操作，<span id="idle-countdown">30</span> 秒后将自动退出登录。
+        </div>
+        <div id="idle-buttons">
+            <button id="idle-stay" class="btn btn-primary">继续会话</button>
+            <button id="idle-logout" class="btn btn-secondary">退出登录</button>
+        </div>
+    </div>
+</div>
+
+<main class="main">
+    <!--第一部分：单个添加用户（加入下方待提交列表）-->
+    <section class="card">
+        <div class="card-title">添加用户</div>
+        <div class="control-row">
+            <label for="single-id">账号id（必填）：</label>
+            <input type="text" id="single-id" class="narrow">
+            <label for="single-name">姓名：</label>
+            <input type="text" id="single-name">
+            <label for="single-age">年龄：</label>
+            <input type="number" id="single-age" min="0" class="narrow">
+            <label for="single-email">邮箱：</label>
+            <input type="text" id="single-email">
+        </div>
+        <div class="control-row">
+            <label for="single-position">身份：</label>
+            <select id="single-position">
+                <option value="student" selected>学生</option>
+                <option value="teacher">教师</option>
+                <option value="admin">管理员</option>
+            </select>
+            <label for="single-password">初始密码：</label>
+            <input type="text" id="single-password">
+            <span class="hint">留空则与账号id相同</span>
+            <button type="button" id="single-add-button">添加</button>
+        </div>
+    </section>
+
+    <!--第二部分：CSV 批量导入（加入下方待提交列表）-->
+    <section class="card" style="margin-top:30px">
+        <div class="card-title">批量导入（CSV）</div>
+        <div class="control-row">
+            <input type="file" id="csv-file" accept=".csv,text/csv">
+            <button type="button" id="csv-import-button">导入</button>
+            <span class="hint">格式：id,name,age,email,position,password（首行表头可省略，留空字段用逗号占位）</span>
+        </div>
+    </section>
+
+    <!--第三部分：待提交用户列表（管理员检查无误后点击提交）-->
+    <section class="card" style="margin-top:30px">
+        <div class="card-title">
+            <span>待提交用户（<span id="pending-count">0</span> 个）</span>
+            <button type="button" id="submit-button">提交</button>
+        </div>
+        <table>
+            <thead>
+            <tr>
+                <th style="width:7%">序号</th>
+                <th style="width:17%">账号</th>
+                <th style="width:15%">姓名</th>
+                <th style="width:8%">年龄</th>
+                <th style="width:20%">邮箱</th>
+                <th style="width:10%">身份</th>
+                <th style="width:14%">初始密码</th>
+                <th style="width:9%">操作</th>
+            </tr>
+            </thead>
+            <tbody id="pending-body"></tbody>
+        </table>
+        <div class="msg-error" id="pending-msg" style="padding:0 18px 12px"></div>
+    </section>
+
+    <!--第四部分：重置用户密码-->
+    <section class="card" style="margin-top:30px">
+        <div class="card-title">重置用户密码</div>
+        <div class="control-row">
+            <label for="reset-user-id">用户id：</label>
+            <input type="text" id="reset-user-id" class="narrow">
+            <label for="reset-new-password">新密码：</label>
+            <input type="text" id="reset-new-password">
+            <span class="hint">留空则重置为该用户的账号id</span>
+            <button type="button" id="reset-button">重置</button>
+        </div>
+        <div class="msg-error" id="reset-msg" style="padding:0 18px 12px"></div>
+    </section>
+</main>
+
+<script th:src="@{/heartbeat.js}"></script>
+<script>
+    const URL_CREATE = '/app_1/admin/user_manage/create';
+    const URL_RESET = '/app_1/admin/user_manage/reset_password';
+
+    // 待提交的用户列表（单个添加与 CSV 导入都加入这里）
+    let pendingUsers = [];
+
+    function handleUnauthorized(resp) {
+        if (resp.status === 401) {
+            alert('登录已过期，请重新登录。');
+            window.location.href = '/app_1/login';
+            return true;
+        }
+        return false;
+    }
+
+    function emptyToNull(value) {
+        return value === undefined || value === null || value.trim() === '' ? null : value.trim();
+    }
+
+    function isPositiveIntegerString(value) {
+        return /^\d+$/.test(value);
+    }
+
+    function renderPending() {
+        document.getElementById('pending-body').innerHTML = pendingUsers.map((user, index) => `
+            <tr>
+                <td>${index + 1}</td>
+                <td>${user.id}</td>
+                <td>${user.name ? user.name : '—'}</td>
+                <td>${user.age !== null && user.age !== undefined ? user.age : '—'}</td>
+                <td>${user.email ? user.email : '—'}</td>
+                <td>${user.position ? user.position : 'student'}</td>
+                <td>${user.password ? user.password : '（同id）'}</td>
+                <td><button type="button" class="remove-button" data-index="${index}">删除</button></td>
+            </tr>
+        `).join('');
+        document.getElementById('pending-count').textContent = pendingUsers.length;
+        document.querySelectorAll('.remove-button').forEach(button => {
+            button.addEventListener('click', function () {
+                pendingUsers.splice(Number(this.dataset.index), 1);
+                renderPending();
+            });
+        });
+    }
+
+    /**往待提交列表加入一行，返回错误信息（空串表示成功）*/
+    function addPendingUser(user) {
+        const id = emptyToNull(String(user.id));
+        if (id === null) {
+            return '账号id不能为空。';
+        }
+        if (!isPositiveIntegerString(id)) {
+            return '账号id必须是数字：' + id;
+        }
+        if (pendingUsers.some(e => String(e.id) === id)) {
+            return '待提交列表中已存在相同的账号id：' + id;
+        }
+        let age = null;
+        if (user.age !== null && user.age !== undefined && String(user.age).trim() !== '') {
+            age = Number(String(user.age).trim());
+            if (!Number.isInteger(age) || age < 0) {
+                return '年龄必须是不小于0的整数：' + user.age;
+            }
+        }
+        pendingUsers.push({
+            id: id,
+            name: emptyToNull(user.name),
+            age: age,
+            email: emptyToNull(user.email),
+            position: emptyToNull(user.position),
+            password: emptyToNull(user.password)
+        });
+        return '';
+    }
+
+    function addSingleUser() {
+        const msgElement = document.getElementById('pending-msg');
+        const error = addPendingUser({
+            id: document.getElementById('single-id').value,
+            name: document.getElementById('single-name').value,
+            age: document.getElementById('single-age').value,
+            email: document.getElementById('single-email').value,
+            position: document.getElementById('single-position').value,
+            password: document.getElementById('single-password').value
+        });
+        msgElement.textContent = error;
+        if (!error) {
+            ['single-id', 'single-name', 'single-age', 'single-email', 'single-password']
+                .forEach(id => document.getElementById(id).value = '');
+            renderPending();
+        }
+    }
+
+    /**解析 CSV 文本：按行、按逗号拆分，支持首行表头*/
+    function parseCsv(text) {
+        const lines = text.split(/\r\n|\r|\n/).filter(line => line.trim() !== '');
+        if (lines.length === 0) {
+            return [];
+        }
+        const rows = lines.map(line => line.split(',').map(cell => cell.trim()));
+        // 首行表头：第一个单元格不是数字时认为是表头，跳过
+        if (!isPositiveIntegerString(rows[0][0])) {
+            rows.shift();
+        }
+        return rows;
+    }
+
+    function importCsv() {
+        const msgElement = document.getElementById('pending-msg');
+        const file = document.getElementById('csv-file').files[0];
+        if (!file) {
+            msgElement.textContent = '请先选择 CSV 文件。';
+            return;
+        }
+        const reader = new FileReader();
+        reader.onload = function () {
+            const errors = [];
+            for (const cells of parseCsv(String(reader.result))) {
+                const error = addPendingUser({
+                    id: cells[0],
+                    name: cells[1],
+                    age: cells[2],
+                    email: cells[3],
+                    position: cells[4],
+                    password: cells[5]
+                });
+                if (error) {
+                    errors.push(error);
+                }
+            }
+            msgElement.textContent = errors.join('；');
+            renderPending();
+        };
+        reader.readAsText(file, 'UTF-8');
+    }
+
+    async function submitUsers() {
+        const msgElement = document.getElementById('pending-msg');
+        if (pendingUsers.length === 0) {
+            msgElement.textContent = '待提交列表为空。';
+            return;
+        }
+        msgElement.textContent = '';
+        try {
+            const resp = await fetch(URL_CREATE, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(pendingUsers.map(user => ({
+                    id: Number(user.id),
+                    name: user.name,
+                    age: user.age,
+                    email: user.email,
+                    position: user.position,
+                    password: user.password
+                })))
+            });
+            if (handleUnauthorized(resp)) return;
+            const result = await resp.json();
+            alert(result.string || (result.isSucceed ? '提交成功。' : '提交失败。'));
+            if (result.isSucceed) {
+                pendingUsers = [];
+                renderPending();
+            }
+        } catch (err) {
+            console.error('创建用户请求失败：', err);
+            msgElement.textContent = '请求失败，请重试。';
+        }
+    }
+
+    async function resetPassword() {
+        const msgElement = document.getElementById('reset-msg');
+        const userId = emptyToNull(document.getElementById('reset-user-id').value);
+        if (userId === null) {
+            msgElement.textContent = '请输入用户id。';
+            return;
+        }
+        if (!isPositiveIntegerString(userId)) {
+            msgElement.textContent = '用户id必须是数字。';
+            return;
+        }
+        const newPassword = emptyToNull(document.getElementById('reset-new-password').value);
+        if (newPassword !== null
+            && (newPassword.length < 9 || newPassword.length > 25)) {
+            msgElement.textContent = '新密码长度需在9~25位之间（留空则重置为账号id）。';
+            return;
+        }
+        msgElement.textContent = '';
+        try {
+            const resp = await fetch(URL_RESET, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: new URLSearchParams({
+                    userId: userId,
+                    newPassword: newPassword === null ? '' : newPassword
+                })
+            });
+            if (handleUnauthorized(resp)) return;
+            const result = await resp.json();
+            if (result.isSucceed) {
+                alert('密码已重置。');
+                document.getElementById('reset-user-id').value = '';
+                document.getElementById('reset-new-password').value = '';
+            } else {
+                msgElement.textContent = result.string || '重置失败。';
+            }
+        } catch (err) {
+            console.error('重置密码请求失败：', err);
+            msgElement.textContent = '请求失败，请重试。';
+        }
+    }
+
+    document.getElementById('single-add-button').addEventListener('click', addSingleUser);
+    document.getElementById('csv-import-button').addEventListener('click', importCsv);
+    document.getElementById('submit-button').addEventListener('click', submitUsers);
+    document.getElementById('reset-button').addEventListener('click', resetPassword);
+    renderPending();
+</script>
+</body>
+</html>

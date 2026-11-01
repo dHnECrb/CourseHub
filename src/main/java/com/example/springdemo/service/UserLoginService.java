@@ -109,7 +109,10 @@ public class UserLoginService {
                 user1Id=userToLogin.getId();
                 log= msgSource.getMessage("logMessage.userIdNotFound",null, Locale.CHINA);
             } else{
-                if (BasicFunctions.safeEquals(userPassword.getPassword(), userToLogin.getPassword())) {
+                // 数据库存储的是加盐哈希值，先对输入的密码求哈希再比较
+                String inputtedPassword = userToLogin.getPassword() == null ? "" : userToLogin.getPassword();
+                String inputtedHash = BasicFunctions.hashPassword(inputtedPassword, userPassword.getSalt());
+                if (BasicFunctions.safeEquals(userPassword.getPassword(), inputtedHash)) {
                     result=true;
                     String position=userPassword.getPosition();
                     if(position.equals(UserPosition.TEACHER.getString())){

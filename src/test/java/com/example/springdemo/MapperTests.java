@@ -5,6 +5,7 @@ import com.example.springdemo.dto.SelectedCourseView;
 import com.example.springdemo.dto.SelectingCourseView;
 import com.example.springdemo.entity.*;
 import com.example.springdemo.mapper.*;
+import com.example.springdemo.util.BasicFunctions;
 import jakarta.annotation.Resource;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -89,7 +90,31 @@ class MapperTests { // 原名：SpringDemoApplicationTests
         userPasswordList=userPasswordMapper.selectList(null);
         userPasswordList.forEach(System.out::println);
 
-        userPasswordMapper.updateById(new UserPassword(11L, "111111", "teacher"));
+        String salt=BasicFunctions.generateSalt();
+        String hash=BasicFunctions.hashPassword("111111", salt);
+        userPasswordMapper.updateById(new UserPassword(11L, hash, salt, "teacher"));
+    }
+
+    /**一次性迁移：把 userPassword 表中的明文密码全部转换为“每用户随机盐 + PBKDF2 加盐哈希”。
+     * 转换后原有密码不变（明文是什么，哈希对应的就是什么），无需重新设置密码。
+     * 已迁移的行（salt 非空且密码为 64 位十六进制）自动跳过，可重复执行。*/
+    @Test
+    public void testMigratePasswordsToHash(){
+        List<UserPassword> userPasswordList=userPasswordMapper.selectList(null);
+        int migrated=0;
+        for (UserPassword userPassword : userPasswordList) {
+            String password=userPassword.getPassword();
+            if (userPassword.getSalt()!=null && password!=null && password.matches("[0-9a-f]{64}")) {
+                continue; // 已迁移
+            }
+            String plain = password==null ? "" : password;
+            String salt=BasicFunctions.generateSalt();
+            String hash=BasicFunctions.hashPassword(plain, salt);
+            userPasswordMapper.updateById(new UserPassword(userPassword.getId(), hash, salt, userPassword.getPosition()));
+            migrated++;
+        }
+        System.out.println("==============已迁移 " + migrated + " 个用户的密码=================");
+        Assert.isTrue(migrated <= userPasswordList.size(), "");
     }
 
     @Test
@@ -99,7 +124,8 @@ class MapperTests { // 原名：SpringDemoApplicationTests
         Long id=12L;
 
         user=new User(id, "Hherern", 20, "hherern@163.com");
-        userPassword=new UserPassword(id, "mySystem", "admin");
+        String salt=BasicFunctions.generateSalt();
+        userPassword=new UserPassword(id, BasicFunctions.hashPassword("mySystem", salt), salt, "admin");
 
         userMapper.insert(user);
         userPasswordMapper.insert(userPassword);
@@ -113,7 +139,7 @@ class MapperTests { // 原名：SpringDemoApplicationTests
         List<UserTask> userTasks = userTaskMapper.selectList(null);
         LocalDateTime localDateTime=LocalDateTime.of(2099,12,31,23,59,59);
         if (userTasks.isEmpty()) {
-            userTaskMapper.insert(new UserTask("修改密码", "all", "", "/index", LocalDateTime.now(), localDateTime));
+            userTaskMapper.insert(new UserTask("修改密码", "all", "", "/change_password", LocalDateTime.now(), localDateTime));
             userTaskMapper.insert(new UserTask("预选课", "student", "", "/index", LocalDateTime.now(), localDateTime));
             userTaskMapper.insert(new UserTask("修改密码", "teacher", "", "/login", LocalDateTime.now(), localDateTime));
             userTaskMapper.insert(new UserTask("Change Password", "admin", "", "/login", LocalDateTime.now(), localDateTime));
