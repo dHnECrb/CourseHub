@@ -118,6 +118,18 @@ class MapperTests { // 原名：SpringDemoApplicationTests
     }
 
     @Test
+    public void resetPassword(){
+        Long userId=12L;
+        String password="123456";
+        UserPosition position=UserPosition.ADMIN;
+
+        String salt=BasicFunctions.generateSalt();
+        String hash=BasicFunctions.hashPassword(password, salt);
+
+        userPasswordMapper.updateById(new UserPassword(userId, hash, salt, position.getString()));
+    }
+
+    @Test
     public void testCreateUser(){
         User user;
         UserPassword userPassword;
