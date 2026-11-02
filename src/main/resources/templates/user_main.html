@@ -90,8 +90,21 @@
 
             // 2. 发请求给后端接口（GET 示例）
             fetch('/app_1/main/tasks?filterTime=' + filterTime)
-                .then(resp => resp.json())
+                .then(resp => {
+                    if (resp.status === 401) {
+                        alert('登录已过期，请重新登录。');
+                        window.location.href = '/app_1/login';
+                        return null;
+                    }
+                    if (!resp.ok) {
+                        throw new Error('HTTP ' + resp.status);
+                    }
+                    return resp.json();
+                })
                 .then(tasks => {
+                    if (tasks === null) {
+                        return;
+                    }
                     // 3. 清空旧数据，重新渲染
                     const tbody = document.getElementById('task-body');
                     tbody.innerHTML = '';

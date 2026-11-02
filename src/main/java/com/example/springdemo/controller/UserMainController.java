@@ -19,8 +19,6 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.ModelAndView;
 
 import java.io.IOException;
-import java.time.LocalDateTime;
-import java.time.ZoneId;
 import java.util.List;
 import java.util.Locale;
 
@@ -102,14 +100,17 @@ public class UserMainController {
     }
 
     @GetMapping("/tasks")
-    public List<UserTask> getTasks(@NonNull HttpSession httpSession,
-                                   @RequestParam(defaultValue = "false") boolean filterTime) {
+    public ResponseEntity<List<UserTask>> getTasks(@NonNull HttpSession httpSession,
+                                                   @RequestParam(defaultValue = "false") boolean filterTime) {
+        if (!BasicFunctions.isLoggedIn(httpSession) || httpSession.getAttribute("userPosition") == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
         // 根据 filterTime 做筛选查询
         if(filterTime) {
-            return userTaskService.getActiveTaskByPosition(httpSession);
+            return ResponseEntity.ok(userTaskService.getActiveTaskByPosition(httpSession));
         }
         else{
-            return userTaskService.getTaskByPosition(httpSession);
+            return ResponseEntity.ok(userTaskService.getTaskByPosition(httpSession));
         }
     }
 
