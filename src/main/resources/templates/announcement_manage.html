@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>公告管理</title>
+    <link rel="icon" th:href="@{/favicon.ico}" type="image/x-icon">
+    <link th:href="@{/select_course_style.css}" rel="stylesheet" type="text/css">
+    <link th:href="@{/idle_mask.css}" rel="stylesheet" type="text/css">
+    <style>
+        .main{max-width:900px;margin:0 auto;padding:60px 18px 50px}
+        .publish-form{padding:22px}
+        .form-field{margin-bottom:18px}
+        .form-field label{display:block;margin-bottom:8px;font-weight:600}
+        .form-field input,.form-field textarea{
+            width:100%;padding:10px 12px;border:1px solid #94a3b8;border-radius:6px;
+            font:inherit;background:#fff;
+        }
+        .form-field textarea{min-height:180px;resize:vertical;line-height:1.7}
+        .publish-actions{display:flex;align-items:center;gap:16px}
+        .publish-actions button{padding:8px 30px;border:1px solid #64748b;border-radius:8px;background:#fff;cursor:pointer}
+        .publish-actions button:hover{background:#f1f5f9}
+        .publish-actions button:disabled{opacity:.5;cursor:not-allowed}
+        #publish-msg{font-size:14px;color:#b91c1c}
+        .latest-content{padding:22px}
+        .announcement-title{margin:0 0 8px;font-size:21px;overflow-wrap:anywhere}
+        .announcement-meta{margin-bottom:16px;color:var(--muted);font-size:13px}
+        .announcement-text{line-height:1.8;white-space:pre-wrap;overflow-wrap:anywhere}
+        .empty{padding:24px;color:var(--muted);text-align:center}
+    </style>
+</head>
+<body>
+<button id="back-button" type="button" onclick="history.back()">← 返回上一级</button>
+
+<div id="idle-mask" style="display:none;">
+    <div id="idle-dialog" role="alertdialog" aria-modal="true">
+        <div id="idle-title">会话即将过期</div>
+        <div id="idle-message">
+            检测到您长时间未操作，<span id="idle-countdown">30</span> 秒后将自动退出登录。
+        </div>
+        <div id="idle-buttons">
+            <button id="idle-stay" class="btn btn-primary">继续会话</button>
+            <button id="idle-logout" class="btn btn-secondary">退出登录</button>
+        </div>
+    </div>
+</div>
+
+<main class="main">
+    <section class="card">
+        <div class="card-title">发布新公告</div>
+        <form class="publish-form" id="publish-form">
+            <div class="form-field">
+                <label for="announcement-title-input">标题（最多 100 字）</label>
+                <input type="text" id="announcement-title-input" maxlength="100" required>
+            </div>
+            <div class="form-field">
+                <label for="announcement-content-input">正文（最多 5000 字）</label>
+                <textarea id="announcement-content-input" maxlength="5000" required></textarea>
+            </div>
+            <div class="publish-actions">
+                <button type="submit" id="publish-button">发布公告</button>
+                <span id="publish-msg" role="alert"></span>
+            </div>
+        </form>
+    </section>
+
+    <section class="card" style="margin-top:30px">
+        <div class="card-title">当前最新公告</div>
+        <div class="latest-content" th:if="${latestAnnouncement != null}">
+            <h2 class="announcement-title" th:text="${latestAnnouncement.title}"></h2>
+            <p class="announcement-meta"
+               th:text="|发布时间：${#temporals.format(latestAnnouncement.publish_time, 'yyyy-MM-dd HH:mm')}　发布者：${latestAnnouncement.publisher_id}|"></p>
+            <div class="announcement-text" th:text="${latestAnnouncement.content}"></div>
+        </div>
+        <div class="empty" th:if="${latestAnnouncement == null}">尚未发布公告</div>
+    </section>
+</main>
+
+<script th:src="@{/heartbeat.js}"></script>
+<script>
+    document.getElementById('publish-form').addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const title = document.getElementById('announcement-title-input').value.trim();
+        const content = document.getElementById('announcement-content-input').value.trim();
+        const msgElement = document.getElementById('publish-msg');
+        if (!title || !content) {
+            msgElement.textContent = '公告标题和正文不能为空。';
+            return;
+        }
+        const publishButton = document.getElementById('publish-button');
+        publishButton.disabled = true;
+        msgElement.textContent = '';
+        try {
+            const resp = await fetch('/app_1/admin/announcement_manage/publish', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                body: new URLSearchParams({title: title, content: content})
+            });
+            if (resp.status === 401) {
+                alert('登录已过期，请重新登录。');
+                window.location.href = '/app_1/login';
+                return;
+            }
+            const result = await resp.json();
+            if (resp.ok && result.isSucceed) {
+                alert(result.string || '公告发布成功。');
+                window.location.reload();
+            } else {
+                msgElement.textContent = result.string || '发布失败，请重试。';
+            }
+        } catch (err) {
+            console.error('发布公告请求失败：', err);
+            msgElement.textContent = '请求失败，请重试。';
+        } finally {
+            publishButton.disabled = false;
+        }
+    });
+</script>
+</body>
+</html>

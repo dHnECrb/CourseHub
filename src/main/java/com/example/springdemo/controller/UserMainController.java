@@ -4,13 +4,17 @@ package com.example.springdemo.controller;
 import com.example.springdemo.dto.HeartBeatRequest;
 import com.example.springdemo.dto.RequestResult;
 import com.example.springdemo.entity.UserTask;
+import com.example.springdemo.service.AnnouncementService;
 import com.example.springdemo.service.UserMainService;
 import com.example.springdemo.service.UserTaskService;
+import com.example.springdemo.util.BasicFunctions;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 import org.jspecify.annotations.NonNull;
 import org.springframework.context.MessageSource;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.ModelAndView;
 
@@ -34,6 +38,9 @@ public class UserMainController {
     private UserTaskService userTaskService;
 
     @Resource
+    private AnnouncementService announcementService;
+
+    @Resource
     private MessageSource msgSource;
 
 //    public UserMainController(UserLoginService userLoginService) {
@@ -55,9 +62,16 @@ public class UserMainController {
 //        userTaskList=userTaskService.getActiveTaskByPosition(httpSession);
         modelAndView.setViewName("user_main");
         modelAndView.addObject("userId", httpSession.getAttribute("userId"));
+        modelAndView.addObject("announcement", announcementService.getAnnouncementToDisplay(httpSession));
 //        modelAndView.addObject("tasks",userTaskList);
 
         return modelAndView;
+    }
+
+    @PostMapping("/announcement/read")
+    public RequestResult readAnnouncement(@NonNull HttpSession httpSession,
+                                          @RequestParam Long announcementId) {
+        return announcementService.markAsRead(httpSession, announcementId);
     }
 
 

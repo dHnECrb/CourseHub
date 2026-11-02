@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>全部公告</title>
+    <link rel="icon" th:href="@{/favicon.ico}" type="image/x-icon">
+    <link th:href="@{/select_course_style.css}" rel="stylesheet" type="text/css">
+    <link th:href="@{/idle_mask.css}" rel="stylesheet" type="text/css">
+    <style>
+        .main{max-width:900px;margin:0 auto;padding:60px 18px 50px}
+        .announcement-list{display:grid;gap:20px}
+        .announcement-item{padding:24px 28px}
+        .announcement-title{margin:0 0 8px;font-size:21px;overflow-wrap:anywhere}
+        .announcement-meta{margin-bottom:18px;color:var(--muted);font-size:13px}
+        .announcement-text{line-height:1.8;white-space:pre-wrap;overflow-wrap:anywhere}
+        .empty{padding:50px 20px;color:var(--muted);text-align:center}
+    </style>
+</head>
+<body>
+<button id="back-button" type="button" onclick="history.back()">← 返回上一级</button>
+
+<div id="idle-mask" style="display:none;">
+    <div id="idle-dialog" role="alertdialog" aria-modal="true">
+        <div id="idle-title">会话即将过期</div>
+        <div id="idle-message">
+            检测到您长时间未操作，<span id="idle-countdown">30</span> 秒后将自动退出登录。
+        </div>
+        <div id="idle-buttons">
+            <button id="idle-stay" class="btn btn-primary">继续会话</button>
+            <button id="idle-logout" class="btn btn-secondary">退出登录</button>
+        </div>
+    </div>
+</div>
+
+<main class="main">
+    <section class="card" style="margin-bottom:24px">
+        <div class="card-title">全部公告</div>
+    </section>
+    <div class="announcement-list" th:if="${!announcements.isEmpty()}">
+        <article class="card announcement-item" th:each="item : ${announcements}">
+            <h2 class="announcement-title" th:text="${item.title}"></h2>
+            <p class="announcement-meta"
+               th:text="|发布时间：${#temporals.format(item.publish_time, 'yyyy-MM-dd HH:mm')}　发布者：${item.publisher_id}|"></p>
+            <div class="announcement-text" th:text="${item.content}"></div>
+        </article>
+    </div>
+    <section class="card empty" th:if="${announcements.isEmpty()}">尚未发布公告</section>
+</main>
+
+<script th:src="@{/heartbeat.js}"></script>
+</body>
+</html>

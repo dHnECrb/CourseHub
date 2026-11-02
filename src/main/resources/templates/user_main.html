@@ -24,6 +24,21 @@
         </div>
     </div>
 
+    <!-- 公告遮罩层与弹窗，定位和会话过期提示保持一致 -->
+    <div id="announcement-mask" th:if="${announcement != null}"
+         th:attr="data-announcement-id=${announcement.id}">
+        <div id="announcement-dialog" role="alertdialog" aria-modal="true" aria-labelledby="announcement-title">
+            <h2 id="announcement-title" th:text="${announcement.title}"></h2>
+            <p class="announcement-time"
+               th:text="|发布时间：${#temporals.format(announcement.publish_time, 'yyyy-MM-dd HH:mm')}|"></p>
+            <div class="announcement-content" th:text="${announcement.content}"></div>
+            <p id="announcement-error" class="announcement-error" role="alert"></p>
+            <div class="announcement-buttons">
+                <button type="button" id="announcement-confirm" class="btn btn-secondary">确认</button>
+                <button type="button" id="announcement-no-remind" class="btn btn-primary">确认且不再提示</button>
+            </div>
+        </div>
+    </div>
 
     <div id="header">
         <div id="header-left">
@@ -100,6 +115,49 @@
                     console.error("任务请求失败：", err);
                     alert('请求失败');
                 });
+        }
+
+        const announcementMask = document.getElementById('announcement-mask');
+        if (announcementMask) {
+            const confirmButton = document.getElementById('announcement-confirm');
+            const noRemindButton = document.getElementById('announcement-no-remind');
+            const errorElement = document.getElementById('announcement-error');
+
+            confirmButton.addEventListener('click', () => {
+                announcementMask.style.display = 'none';
+            });
+
+            noRemindButton.addEventListener('click', async () => {
+                confirmButton.disabled = true;
+                noRemindButton.disabled = true;
+                errorElement.textContent = '';
+                try {
+                    const resp = await fetch('/app_1/main/announcement/read', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                        body: new URLSearchParams({
+                            announcementId: announcementMask.dataset.announcementId
+                        })
+                    });
+                    if (resp.status === 401) {
+                        alert('登录已过期，请重新登录。');
+                        window.location.href = '/app_1/login';
+                        return;
+                    }
+                    const result = await resp.json();
+                    if (resp.ok && result.isSucceed) {
+                        announcementMask.style.display = 'none';
+                    } else {
+                        errorElement.textContent = result.string || '设置失败，请重试。';
+                    }
+                } catch (err) {
+                    console.error('公告确认请求失败：', err);
+                    errorElement.textContent = '请求失败，请重试。';
+                } finally {
+                    confirmButton.disabled = false;
+                    noRemindButton.disabled = false;
+                }
+            });
         }
         refreshTaskTable();
     </script>
