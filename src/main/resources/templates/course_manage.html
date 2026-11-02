@@ -335,12 +335,17 @@
             if (result.isSucceed) {
                 if (editingId === id) resetForm();
                 await loadCourses();
+                alert(result.string || '删除成功。');
+            } else {
+                const errorMessage = result.string || '删除失败。';
+                msg.textContent = errorMessage;
+                alert(errorMessage);
             }
-            msg.textContent = result.isSucceed ? '' : (result.string || '删除失败。');
-            if (result.isSucceed) alert(result.string || '删除成功。');
         } catch (error) {
             console.error('删除课程失败：', error);
-            msg.textContent = '请求失败，请重试。';
+            const errorMessage = '请求失败，请重试。';
+            msg.textContent = errorMessage;
+            alert(errorMessage);
         }
     }
 
