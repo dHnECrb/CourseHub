@@ -56,6 +56,15 @@ public class UserMainService {
         boolean isSucceed;
         if(BasicFunctions.isLoggedIn(httpSession)){
             isSucceed=onlineUserManager.heartbeat(httpSession, lastActiveTime);
+            if(!isSucceed && !onlineUserManager.isOnline(httpSession)){
+                String userId=(String)httpSession.getAttribute("userId");
+                onlineUserManager.logout(httpSession);
+                httpSession.setAttribute("userId",null);
+                httpSession.setAttribute("userPosition",null);
+                BasicFunctions.printTimeHttpSessionAnd(httpSession, userId,
+                        msgSource.getMessage("logMessage.loggedOutDueToHeartBeatTimeOut", null, Locale.CHINA));
+                return new RequestResult(false, 401, null);
+            }
 //            BasicFunctions.printTimeHttpSessionAnd(httpSession, (String)httpSession.getAttribute("userId"),
 //                    "心跳\t"+ Instant.ofEpochMilli(lastActiveTime)
 //                            .atZone(ZoneId.systemDefault())

@@ -39,7 +39,11 @@ public final class BasicFunctions {
     }
 
     public static void printTimeHttpSessionAnd(@NonNull HttpSession httpSession, @NonNull String userId, Object object){
-        System.out.println(BasicFunctions.getFormatTime()+"  HttpSessionId: "+httpSession.getId()+"\tid: "+userId+"\t"+object);
+        printTimeHttpSessionIdAnd(httpSession.getId(), userId, object);
+    }
+
+    public static void printTimeHttpSessionIdAnd(@NonNull String sessionId, @NonNull String userId, Object object){
+        System.out.println(BasicFunctions.getFormatTime()+"  HttpSessionId: "+sessionId+"\tid: "+userId+"\t"+object);
     }
 
     public static void printTimeHttpSessionAnd(@NonNull HttpSession httpSession, @NonNull String userId1, @NonNull String userId2, Object object){

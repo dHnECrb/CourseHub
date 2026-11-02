@@ -1,42 +1,46 @@
 package com.example.springdemo.manager;
 
-
 import com.example.springdemo.util.BasicFunctions;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpSession;
 import org.jspecify.annotations.NonNull;
 import org.springframework.context.MessageSource;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
+import java.time.Duration;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.Set;
 import java.util.stream.Collectors;
-
 
 @Component
 public class OnlineUserManager {
     @Resource
     private MessageSource msgSource;
 
-    /** key: sessionId, value: 最近心跳时间*/
-    private final Map<HttpSession, Long> onlineUsers = new ConcurrentHashMap<>();
-
-    /** key: sessionId, value: 最近操作时间*/
-    private final Map<HttpSession, Long> onlineUsersLastActive = new ConcurrentHashMap<>();
+    private static final String HEARTBEAT_KEY_PREFIX = "online:heartbeat:";
+    private static final String SESSION_USERS_KEY = "online:sessionUsers";
+    private static final String LAST_ACTIVE_KEY = "online:lastActive";
+    private static final String USER_SESSIONS_KEY_PREFIX = "online:user:";
+    private static final String LIMITS_KEY = "online:limits";
+    private static final String MAX_ONLINE_USER_COUNT_FIELD = "maxOnlineUserCount";
+    private static final String MAX_SESSION_COUNT_PER_USER_FIELD = "maxSessionCountPerUser";
 
     /** 心跳超时阈值：超过 2 分钟无心跳视为离线 */
-    private static final long HEART_BEAT_TIMEOUT = 2 * 60 * 1000L;
+    private static final Duration HEART_BEAT_TIMEOUT = Duration.ofMinutes(2);
 
     /** 操作超时阈值：超过 6 分钟无操作视为离线 */
     private static final long LAST_ACTIVE_TIMEOUT = 6 * 60 * 1000L;
 
-    /** 在线用户数量上限，默认 50；0 表示不限制 */
-    private volatile int maxOnlineUserCount = 50;
+    private static final int DEFAULT_MAX_ONLINE_USER_COUNT = 50;
+    private static final int DEFAULT_MAX_SESSION_COUNT_PER_USER = 2;
 
-    /** 单个用户的会话数量上限，默认 2；0 表示不限制 */
-    private volatile int maxSessionCountPerUser = 2;
+    @Resource(name = "stringRedisTemplate")
+    private StringRedisTemplate redisTemplate;
 
     /** 检查登录是否被数量限制所拒绝：可以登录 */
     public static final int LOGIN_ALLOWED = 0;
@@ -46,19 +50,26 @@ public class OnlineUserManager {
     public static final int LOGIN_DENIED_BY_SESSION_COUNT = 2;
 
     public int getMaxOnlineUserCount() {
-        return maxOnlineUserCount;
+        return getLimit(MAX_ONLINE_USER_COUNT_FIELD, DEFAULT_MAX_ONLINE_USER_COUNT);
     }
 
     public void setMaxOnlineUserCount(int maxOnlineUserCount) {
-        this.maxOnlineUserCount = maxOnlineUserCount;
+        redisTemplate.opsForHash().put(LIMITS_KEY, MAX_ONLINE_USER_COUNT_FIELD,
+                Integer.toString(maxOnlineUserCount));
     }
 
     public int getMaxSessionCountPerUser() {
-        return maxSessionCountPerUser;
+        return getLimit(MAX_SESSION_COUNT_PER_USER_FIELD, DEFAULT_MAX_SESSION_COUNT_PER_USER);
     }
 
     public void setMaxSessionCountPerUser(int maxSessionCountPerUser) {
-        this.maxSessionCountPerUser = maxSessionCountPerUser;
+        redisTemplate.opsForHash().put(LIMITS_KEY, MAX_SESSION_COUNT_PER_USER_FIELD,
+                Integer.toString(maxSessionCountPerUser));
+    }
+
+    private int getLimit(String field, int defaultValue) {
+        Object value = redisTemplate.opsForHash().get(LIMITS_KEY, field);
+        return value == null ? defaultValue : Integer.parseInt(value.toString());
     }
 
     /** 检查指定用户能否在当前会话登录（受在线用户数量与单用户会话数量限制）
@@ -66,17 +77,17 @@ public class OnlineUserManager {
      * @param httpSession 当前http会话
      * @return LOGIN_ALLOWED / LOGIN_DENIED_BY_USER_COUNT / LOGIN_DENIED_BY_SESSION_COUNT */
     public int checkCanLogin(@NonNull String userId, @NonNull HttpSession httpSession) {
-        // 当前会话已登录同一账号时属于重复登录，不会新增用户与会话，不受限制
+        String sessionId = httpSession.getId();
         boolean alreadyInThisSession = userId.equals(httpSession.getAttribute("userId"));
+        int maxOnlineUserCount = getMaxOnlineUserCount();
         if (maxOnlineUserCount > 0 && !alreadyInThisSession
                 && getOnlineUserCount() >= maxOnlineUserCount) {
             return LOGIN_DENIED_BY_USER_COUNT;
         }
+        int maxSessionCountPerUser = getMaxSessionCountPerUser();
         if (maxSessionCountPerUser > 0) {
-            long otherSessionCount = onlineUsers.keySet().stream()
-                    .filter(session -> session != httpSession)
-                    .map(session -> (String) session.getAttribute("userId"))
-                    .filter(userId::equals)
+            long otherSessionCount = getActiveUserSessionIds(userId).stream()
+                    .filter(id -> !id.equals(sessionId))
                     .count();
             if (otherSessionCount >= maxSessionCountPerUser) {
                 return LOGIN_DENIED_BY_SESSION_COUNT;
@@ -85,113 +96,185 @@ public class OnlineUserManager {
         return LOGIN_ALLOWED;
     }
 
-    /**获取每个在线用户的最近活跃时间（其所有会话最近操作时间的最晚值）
-     * @return key: 账号，value: 最近活跃时间（毫秒时间戳）*/
-    public Map<String, Long> getUserLastActiveTime(){
-        Map<String, Long> lastActiveTimeByUser = new java.util.HashMap<>();
-        onlineUsersLastActive.forEach((session, lastActiveTime) -> {
-            String userId = (String) session.getAttribute("userId");
-            if (userId != null) {
+    /** 获取每个在线用户的最近活跃时间（其所有会话最近操作时间的最晚值）
+     * @return key: 账号，value: 最近活跃时间（毫秒时间戳） */
+    public Map<String, Long> getUserLastActiveTime() {
+        Map<String, Long> lastActiveTimeByUser = new HashMap<>();
+        for (String sessionId : getActiveSessionIds()) {
+            String userId = getSessionUserId(sessionId);
+            Long lastActiveTime = getLastActiveTime(sessionId);
+            if (userId != null && lastActiveTime != null) {
                 lastActiveTimeByUser.merge(userId, lastActiveTime, Math::max);
             }
-        });
+        }
         return lastActiveTimeByUser;
     }
 
-    public void login(HttpSession httpSession) {
-        onlineUsers.put(httpSession, System.currentTimeMillis());
-        onlineUsersLastActive.put(httpSession, System.currentTimeMillis());
+    public void login(@NonNull HttpSession httpSession) {
+        String sessionId = httpSession.getId();
+        String userId = (String) httpSession.getAttribute("userId");
+        if (userId == null) {
+            throw new IllegalArgumentException("登录会话缺少用户账号");
+        }
+        long now = System.currentTimeMillis();
+        refreshHeartbeat(sessionId, now);
+        redisTemplate.opsForHash().put(SESSION_USERS_KEY, sessionId, userId);
+        redisTemplate.opsForHash().put(LAST_ACTIVE_KEY, sessionId, Long.toString(now));
+        redisTemplate.opsForSet().add(userSessionsKey(userId), sessionId);
+    }
+
+    public boolean isOnline(@NonNull HttpSession httpSession) {
+        return hasHeartbeat(httpSession.getId());
     }
 
     public boolean heartbeat(@NonNull HttpSession httpSession, @NonNull Long lastActiveTime) {
-        Long storedLastActive = onlineUsersLastActive.get(httpSession);
-//        System.out.println(lastActiveTime+"\t"+storedLastActive);
-        if(lastActiveTime<storedLastActive){
+        String sessionId = httpSession.getId();
+        if (!hasHeartbeat(sessionId)) {
+            removeSession(sessionId);
+            return false;
+        }
+        Long storedLastActive = getLastActiveTime(sessionId);
+        if (storedLastActive == null) {
+            removeSession(sessionId);
+            return false;
+        }
+        if (lastActiveTime < storedLastActive) {
             return false;
         }
 
-        onlineUsers.computeIfPresent(httpSession,
-                (k, v) -> System.currentTimeMillis());
-        onlineUsersLastActive.replace(httpSession, lastActiveTime);
+        long now = System.currentTimeMillis();
+        refreshHeartbeat(sessionId, now);
+        redisTemplate.opsForHash().put(LAST_ACTIVE_KEY, sessionId, lastActiveTime.toString());
         return true;
     }
 
-    public void logout(HttpSession httpSession) {// 用户手动注销或超时未操作而自动注销
-        onlineUsers.remove(httpSession);
-        onlineUsersLastActive.remove(httpSession);
+    /** 用户手动注销或超时未操作而自动注销 */
+    public void logout(@NonNull HttpSession httpSession) {
+        removeSession(httpSession.getId());
     }
 
-    private void logoutAuto(@NonNull HttpSession httpSession, String message){
-        Object userId;
-        try {
-            userId = httpSession.getAttribute("userId");
-        } catch (IllegalStateException e) {
-            BasicFunctions.printTimeHttpSessionAnd(httpSession,
-                    msgSource.getMessage("logMessage.loggedOutInvalidatedSession", null, Locale.CHINA));
-            return;
-        }
-        if(userId==null){
-            return;
-        }
-        httpSession.setAttribute("userId",null);
-        httpSession.setAttribute("userPosition",null);
-        BasicFunctions.printTimeHttpSessionAnd(httpSession, (String) userId, message);
-
-    }
-
-    public void logoutDueToTimeOut(@NonNull HttpSession httpSession){
-        logoutAuto(httpSession, msgSource.getMessage("logMessage.loggedOutDueToHeartBeatTimeOut", null, Locale.CHINA));
-    }
-
-    public void logoutDueToNoActionByBackend(@NonNull HttpSession httpSession){
-        logoutAuto(httpSession, msgSource.getMessage("logMessage.loggedOutDueToNoAction_backend", null, Locale.CHINA));
-
-    }
-
-    /**获取已登录会话数量（注意同一个用户可以在多个会话中登录）*/
+    /** 获取已登录会话数量（注意同一个用户可以在多个会话中登录） */
     public int getOnlineSessionCount() {
-        return onlineUsers.size();
+        return getActiveSessionIds().size();
     }
 
-    /**获取已登录用户数量，同一用户在不同会话中登录，只算1个*/
-    public int getOnlineUserCount(){
-        return onlineUsers.keySet().stream()
-                .map(session -> (String) session.getAttribute("userId"))
+    /** 获取已登录用户数量，同一用户在不同会话中登录，只算1个 */
+    public int getOnlineUserCount() {
+        return getActiveSessionIds().stream()
+                .map(this::getSessionUserId)
+                .filter(Objects::nonNull)
                 .collect(Collectors.toSet())
                 .size();
     }
 
-    /**获取已登录用户的会话数量*/
-    public Map<String, Long> getUserSessionCount(){
-        return onlineUsers.keySet().stream()
-                .map(session -> (String) session.getAttribute("userId"))
+    /** 获取已登录用户的会话数量 */
+    public Map<String, Long> getUserSessionCount() {
+        return getActiveSessionIds().stream()
+                .map(this::getSessionUserId)
                 .filter(Objects::nonNull)
                 .collect(Collectors.groupingBy(id -> id, Collectors.counting()));
     }
 
     /** 由定时任务调用，剔除僵尸用户会话 */
     public int evictStaleUsers() {
-        int beforeCount= getOnlineSessionCount();
-        int afterCount;
+        int deletedCount = 0;
         long now = System.currentTimeMillis();
-//        onlineUsers.entrySet().removeIf(e -> now - e.getValue() > TIMEOUT);
-        onlineUsers.entrySet()
-                .stream()
-                .filter(e -> now - e.getValue() > HEART_BEAT_TIMEOUT)
-                .forEach(e -> {
-                    logoutDueToTimeOut(e.getKey());
-                    onlineUsers.remove(e.getKey());
-                    onlineUsersLastActive.remove(e.getKey());
-                });
-        onlineUsersLastActive.entrySet()
-                .stream()
-                .filter(e -> now-e.getValue()>LAST_ACTIVE_TIMEOUT)
-                .forEach(e -> {
-                    logoutDueToNoActionByBackend(e.getKey());
-                    onlineUsers.remove(e.getKey());
-                    onlineUsersLastActive.remove(e.getKey());
-                });
-        afterCount= getOnlineSessionCount();
-        return beforeCount-afterCount;
+        for (String sessionId : getAllSessionIds()) {
+            String userId = getSessionUserId(sessionId);
+            if (!hasHeartbeat(sessionId)) {
+                if (userId != null) {
+                    BasicFunctions.printTimeHttpSessionIdAnd(sessionId, userId,
+                            msgSource.getMessage("logMessage.loggedOutDueToHeartBeatTimeOut", null, Locale.CHINA));
+                }
+                removeSession(sessionId);
+                deletedCount++;
+                continue;
+            }
+            Long lastActiveTime = getLastActiveTime(sessionId);
+            if (lastActiveTime == null || now - lastActiveTime > LAST_ACTIVE_TIMEOUT) {
+                if (userId != null) {
+                    BasicFunctions.printTimeHttpSessionIdAnd(sessionId, userId,
+                            msgSource.getMessage("logMessage.loggedOutDueToNoAction_backend", null, Locale.CHINA));
+                }
+                removeSession(sessionId);
+                deletedCount++;
+            }
+        }
+        return deletedCount;
+    }
+
+    private void refreshHeartbeat(String sessionId, long heartbeatTime) {
+        redisTemplate.opsForValue().set(heartbeatKey(sessionId), Long.toString(heartbeatTime),
+                HEART_BEAT_TIMEOUT);
+    }
+
+    private boolean hasHeartbeat(String sessionId) {
+        return Boolean.TRUE.equals(redisTemplate.hasKey(heartbeatKey(sessionId)));
+    }
+
+    private String getSessionUserId(String sessionId) {
+        Object userId = redisTemplate.opsForHash().get(SESSION_USERS_KEY, sessionId);
+        return userId == null ? null : userId.toString();
+    }
+
+    private Long getLastActiveTime(String sessionId) {
+        Object lastActiveTime = redisTemplate.opsForHash().get(LAST_ACTIVE_KEY, sessionId);
+        return lastActiveTime == null ? null : Long.parseLong(lastActiveTime.toString());
+    }
+
+    private Set<String> getAllSessionIds() {
+        Set<Object> sessionIds = redisTemplate.opsForHash().keys(SESSION_USERS_KEY);
+        if (sessionIds == null || sessionIds.isEmpty()) {
+            return Set.of();
+        }
+        return sessionIds.stream().map(Object::toString).collect(Collectors.toSet());
+    }
+
+    private Set<String> getActiveSessionIds() {
+        Set<String> activeSessionIds = new HashSet<>();
+        for (String sessionId : getAllSessionIds()) {
+            if (hasHeartbeat(sessionId)) {
+                activeSessionIds.add(sessionId);
+            }
+            else {
+                removeSession(sessionId);
+            }
+        }
+        return activeSessionIds;
+    }
+
+    private Set<String> getActiveUserSessionIds(String userId) {
+        Set<String> sessionIds = redisTemplate.opsForSet().members(userSessionsKey(userId));
+        if (sessionIds == null || sessionIds.isEmpty()) {
+            return Set.of();
+        }
+        Set<String> activeSessionIds = new HashSet<>();
+        for (String sessionId : sessionIds) {
+            if (hasHeartbeat(sessionId)) {
+                activeSessionIds.add(sessionId);
+            }
+            else {
+                removeSession(sessionId);
+            }
+        }
+        return activeSessionIds;
+    }
+
+    private void removeSession(String sessionId) {
+        String userId = getSessionUserId(sessionId);
+        redisTemplate.delete(heartbeatKey(sessionId));
+        redisTemplate.opsForHash().delete(SESSION_USERS_KEY, sessionId);
+        redisTemplate.opsForHash().delete(LAST_ACTIVE_KEY, sessionId);
+        if (userId != null) {
+            redisTemplate.opsForSet().remove(userSessionsKey(userId), sessionId);
+        }
+    }
+
+    private static String heartbeatKey(String sessionId) {
+        return HEARTBEAT_KEY_PREFIX + sessionId;
+    }
+
+    private static String userSessionsKey(String userId) {
+        return USER_SESSIONS_KEY_PREFIX + userId;
     }
 }

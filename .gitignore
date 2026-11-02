@@ -7,6 +7,9 @@ target/
 # 包含密码等信息
 src/main/resources/application.yml
 
+Query.sql
+
+
 ### STS ###
 .apt_generated
 .classpath
