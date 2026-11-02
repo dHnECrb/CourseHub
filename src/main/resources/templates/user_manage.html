@@ -180,6 +180,7 @@
             <input type="text" id="single-password">
             <span class="hint">留空则与账号id相同</span>
             <button type="button" id="single-add-button">添加</button>
+            <span class="msg-error" id="single-msg"></span>
         </div>
     </section>
 
@@ -342,7 +343,7 @@
     }
 
     function addSingleUser() {
-        const msgElement = document.getElementById('pending-msg');
+        const msgElement = document.getElementById('single-msg');
         const error = addPendingUser({
             id: document.getElementById('single-id').value,
             name: document.getElementById('single-name').value,
