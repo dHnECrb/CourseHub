@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>课程管理</title>
+    <link rel="icon" th:href="@{/favicon.ico}" type="image/x-icon">
+    <link th:href="@{/select_course_style.css}" rel="stylesheet" type="text/css">
+    <link th:href="@{/idle_mask.css}" rel="stylesheet" type="text/css">
+    <style>
+        .main{max-width:1280px;margin:0 auto;padding:60px 18px 50px}
+        .control-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:14px 18px;border-bottom:1px solid var(--line);background:#f8fafc;font-size:14px}
+        .control-row label{white-space:nowrap}
+        .control-row input,.control-row select{padding:6px 8px;font-size:14px;border:1px solid #94a3b8;border-radius:6px;background:#fff}
+        .control-row input[type="text"],.control-row input[type="number"]{width:145px}
+        .control-row input.narrow{width:115px}
+        .control-row button,.card-title button,.page-row button,.action-button{padding:6px 20px;font-size:14px;border:1px solid #64748b;border-radius:8px;background:#fff;cursor:pointer}
+        .control-row button:hover,.card-title button:hover,.page-row button:hover,.action-button:hover{background:#f1f5f9}
+        button:disabled{opacity:.45;cursor:not-allowed}
+        .hint{color:var(--muted);font-size:13px}
+        .message{color:#b91c1c;font-size:13px;min-height:18px;padding:0 18px 12px;white-space:pre-line}
+        .hidden-file-input{position:absolute;width:1px;height:1px;opacity:0;overflow:hidden}
+        .select-button{display:inline-block;padding:6px 22px;font-size:14px;border:1px solid #64748b;border-radius:8px;background:#fff;cursor:pointer}
+        .select-button:hover{background:#f1f5f9}
+        .action-button{padding:3px 10px;font-size:13px;margin:2px}
+        .page-row{display:flex;align-items:center;justify-content:center;gap:12px;padding:12px 18px;border-top:1px solid var(--line);background:#f8fafc;font-size:14px}
+        .page-row input{width:65px;padding:5px 8px;border:1px solid #94a3b8;border-radius:6px}
+        .page-info{min-width:170px;text-align:center}
+        #pending-card{overflow:visible}
+        #pending-table thead th{position:sticky;top:0;z-index:10}
+    </style>
+</head>
+<body>
+<button id="back-button" type="button" onclick="history.back()">← 返回上一级</button>
+
+<div id="idle-mask" style="display:none;">
+    <div id="idle-dialog" role="alertdialog" aria-modal="true">
+        <div id="idle-title">会话即将过期</div>
+        <div id="idle-message">检测到您长时间未操作，<span id="idle-countdown">30</span> 秒后将自动退出登录。</div>
+        <div id="idle-buttons">
+            <button id="idle-stay" class="btn btn-primary">继续会话</button>
+            <button id="idle-logout" class="btn btn-secondary">退出登录</button>
+        </div>
+    </div>
+</div>
+
+<main class="main">
+    <section class="card">
+        <div class="card-title">课程查询</div>
+        <div class="control-row">
+            <label for="query-id">课程编号：</label><input type="text" id="query-id" class="narrow">
+            <label for="query-name">课程名：</label><input type="text" id="query-name">
+            <label for="query-term">学期：</label><input type="text" id="query-term" placeholder="如2026-2027-1">
+            <label for="query-property">课程性质：</label><input type="text" id="query-property">
+            <label for="query-offer">是否开课：</label>
+            <select id="query-offer"><option value="">全部</option><option value="true">是</option><option value="false">否</option></select>
+            <button type="button" id="query-button">查询</button>
+            <button type="button" id="reset-query-button">清空条件</button>
+        </div>
+        <table>
+            <thead><tr><th>序号</th><th>课程编号</th><th>课程名</th><th>学年学期</th><th>课程性质</th><th>是否开课</th><th>学分</th><th>操作</th></tr></thead>
+            <tbody id="course-body"></tbody>
+        </table>
+        <div class="page-row">
+            <label for="course-page-size">每页行数：</label><input type="number" id="course-page-size" min="1" max="100" value="20">
+            <button type="button" id="course-prev">上一页</button><span id="course-page-info" class="page-info"></span><button type="button" id="course-next">下一页</button>
+        </div>
+        <div class="message" id="course-msg"></div>
+    </section>
+
+    <section class="card" style="margin-top:30px">
+        <div class="card-title" id="form-title">新增课程</div>
+        <div class="control-row">
+            <label for="form-id">课程编号：</label><input type="text" id="form-id" class="narrow">
+            <label for="form-name">课程名：</label><input type="text" id="form-name">
+            <label for="form-term">学年学期：</label><input type="text" id="form-term" placeholder="YYYY-YYYY-1/2">
+        </div>
+        <div class="control-row">
+            <label for="form-property">课程性质：</label><input type="text" id="form-property">
+            <label for="form-offer">是否开课：</label><select id="form-offer"><option value="true">是</option><option value="false">否</option></select>
+            <label for="form-credit">学分：</label><input type="number" id="form-credit" min="1" step="1" class="narrow">
+            <button type="button" id="save-button">新增</button>
+            <button type="button" id="cancel-edit-button" style="display:none">取消编辑</button>
+            <span class="hint">除特别说明外均为必填项；修改时课程编号不可更改</span>
+        </div>
+        <div class="message" id="form-msg"></div>
+    </section>
+
+    <section class="card" style="margin-top:30px">
+        <div class="card-title">CSV 批量操作</div>
+        <div class="control-row">
+            <label for="csv-operation">操作类型：</label>
+            <select id="csv-operation"><option value="create">批量新增</option><option value="update">批量修改</option><option value="delete">批量删除</option></select>
+            <input type="file" id="csv-file" class="hidden-file-input" accept=".csv,text/csv">
+            <label class="select-button" for="csv-file">选择文件</label><span id="csv-file-name" class="hint">未选择文件</span>
+            <button type="button" id="csv-import-button">导入预览</button>
+            <span class="hint" id="csv-hint"></span>
+        </div>
+    </section>
+
+    <section class="card" id="pending-card" style="margin-top:30px">
+        <div class="card-title"><span>待提交课程（<span id="pending-count">0</span> 条）</span><button type="button" id="submit-pending-button">提交</button></div>
+        <table id="pending-table">
+            <thead><tr><th>序号</th><th>操作</th><th>课程编号</th><th>课程名</th><th>学年学期</th><th>课程性质</th><th>是否开课</th><th>学分</th><th>操作</th></tr></thead>
+            <tbody id="pending-body"></tbody>
+        </table>
+        <div class="page-row">
+            <label for="pending-page-size">每页行数：</label><input type="number" id="pending-page-size" min="1" max="100" value="20">
+            <button type="button" id="pending-prev">上一页</button><span id="pending-page-info" class="page-info"></span><button type="button" id="pending-next">下一页</button>
+        </div>
+        <div class="message" id="pending-msg"></div>
+    </section>
+</main>
+
+<script th:src="@{/heartbeat.js}"></script>
+<script>
+    const BASE_URL = '/app_1/admin/course_manage';
+    const OPERATION_NAMES = {create: '新增', update: '修改', delete: '删除'};
+    let courses = [];
+    let coursePage = 1;
+    let pendingRows = [];
+    let pendingPage = 1;
+    let pendingOperation = null;
+    let editingId = null;
+
+    function getPageSize(id) {
+        const value = Number.parseInt(document.getElementById(id).value, 10);
+        return Number.isInteger(value) && value > 0 ? Math.min(value, 100) : 20;
+    }
+
+    function addCell(row, value) {
+        const cell = document.createElement('td');
+        cell.textContent = value === null || value === undefined || value === '' ? '—' : String(value);
+        row.appendChild(cell);
+        return cell;
+    }
+
+    function addActionButton(cell, text, handler) {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'action-button';
+        button.textContent = text;
+        button.addEventListener('click', handler);
+        cell.appendChild(button);
+    }
+
+    function handleHttpError(resp) {
+        if (resp.status === 401) {
+            alert('登录已过期，请重新登录。');
+            window.location.href = '/app_1/login';
+            return true;
+        }
+        if (resp.status === 403) {
+            alert('您没有权限执行此操作。');
+            return true;
+        }
+        return false;
+    }
+
+    async function readResult(resp) {
+        if (handleHttpError(resp)) return null;
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        const result = await resp.json();
+        if (result.code === 401) {
+            alert('登录已过期，请重新登录。');
+            window.location.href = '/app_1/login';
+            return null;
+        }
+        if (result.code === 403) {
+            alert(result.string || '您没有权限执行此操作。');
+            return null;
+        }
+        return result;
+    }
+
+    function normalizeId(value) {
+        const text = value === null || value === undefined ? '' : String(value).trim();
+        if (!/^\d+$/.test(text)) return {error: '课程编号必须为正整数'};
+        const id = Number(text);
+        if (!Number.isSafeInteger(id) || id <= 0) return {error: '课程编号超出有效范围'};
+        return {id};
+    }
+
+    function normalizeCourse(raw) {
+        const idResult = normalizeId(raw.id);
+        if (idResult.error) return idResult;
+        const name = raw.name === null || raw.name === undefined ? '' : String(raw.name).trim();
+        const term = raw.term === null || raw.term === undefined ? '' : String(raw.term).trim();
+        const property = raw.property === null || raw.property === undefined ? '' : String(raw.property).trim();
+        if (!name) return {error: '课程名不能为空'};
+        if (!property) return {error: '课程性质不能为空'};
+        const termMatch = term.match(/^(\d{4})-(\d{4})-([12])$/);
+        if (!termMatch || Number(termMatch[2]) !== Number(termMatch[1]) + 1) {
+            return {error: '学期格式或学年不正确'};
+        }
+        let willOffer;
+        if (raw.will_offer === true || raw.will_offer === false) {
+            willOffer = raw.will_offer;
+        } else {
+            const offerText = String(raw.will_offer ?? '').trim().toLowerCase();
+            if (offerText === '1' || offerText === 'true') willOffer = true;
+            else if (offerText === '0' || offerText === 'false') willOffer = false;
+            else return {error: '是否开课应填写1/0或true/false'};
+        }
+        const creditText = String(raw.credit ?? '').trim();
+        if (!/^\d+$/.test(creditText) || Number(creditText) <= 0) return {error: '学分必须为正整数'};
+        return {course: {id: idResult.id, name, term, property, will_offer: willOffer, credit: Number(creditText)}};
+    }
+
+    function renderCourses() {
+        const pageSize = getPageSize('course-page-size');
+        const pageCount = Math.max(1, Math.ceil(courses.length / pageSize));
+        coursePage = Math.min(coursePage, pageCount);
+        const start = (coursePage - 1) * pageSize;
+        const body = document.getElementById('course-body');
+        body.replaceChildren();
+        courses.slice(start, start + pageSize).forEach((course, index) => {
+            const row = document.createElement('tr');
+            addCell(row, start + index + 1);
+            addCell(row, course.id);
+            addCell(row, course.name);
+            addCell(row, course.term);
+            addCell(row, course.property);
+            addCell(row, course.will_offer ? '是' : '否');
+            addCell(row, course.credit);
+            const actions = addCell(row, '');
+            actions.textContent = '';
+            addActionButton(actions, '编辑', () => startEdit(course));
+            addActionButton(actions, '删除', () => deleteCourse(course.id));
+            body.appendChild(row);
+        });
+        document.getElementById('course-page-info').textContent = `第 ${coursePage} / ${pageCount} 页（共 ${courses.length} 门）`;
+        document.getElementById('course-prev').disabled = coursePage <= 1;
+        document.getElementById('course-next').disabled = coursePage >= pageCount;
+    }
+
+    async function loadCourses() {
+        const msg = document.getElementById('course-msg');
+        msg.textContent = '';
+        const params = new URLSearchParams();
+        const filters = {id: 'query-id', name: 'query-name', term: 'query-term', property: 'query-property'};
+        Object.entries(filters).forEach(([key, id]) => {
+            const value = document.getElementById(id).value.trim();
+            if (value) params.set(key, value);
+        });
+        const offer = document.getElementById('query-offer').value;
+        if (offer) params.set('willOffer', offer);
+        try {
+            const resp = await fetch(BASE_URL + '/list?' + params.toString());
+            if (handleHttpError(resp)) return;
+            if (!resp.ok) throw new Error('HTTP ' + resp.status);
+            courses = await resp.json();
+            renderCourses();
+        } catch (error) {
+            console.error('查询课程失败：', error);
+            msg.textContent = '查询失败，请稍后重试。';
+        }
+    }
+
+    function resetForm() {
+        editingId = null;
+        document.getElementById('form-title').textContent = '新增课程';
+        document.getElementById('save-button').textContent = '新增';
+        document.getElementById('cancel-edit-button').style.display = 'none';
+        document.getElementById('form-id').disabled = false;
+        ['form-id', 'form-name', 'form-term', 'form-property', 'form-credit'].forEach(id => document.getElementById(id).value = '');
+        document.getElementById('form-offer').value = 'true';
+        document.getElementById('form-msg').textContent = '';
+    }
+
+    function startEdit(course) {
+        editingId = course.id;
+        document.getElementById('form-title').textContent = '修改课程';
+        document.getElementById('save-button').textContent = '保存修改';
+        document.getElementById('cancel-edit-button').style.display = '';
+        document.getElementById('form-id').value = course.id;
+        document.getElementById('form-id').disabled = true;
+        document.getElementById('form-name').value = course.name || '';
+        document.getElementById('form-term').value = course.term || '';
+        document.getElementById('form-property').value = course.property || '';
+        document.getElementById('form-offer').value = String(course.will_offer);
+        document.getElementById('form-credit').value = course.credit;
+        document.getElementById('form-msg').textContent = '';
+        document.getElementById('form-title').scrollIntoView({behavior: 'smooth', block: 'center'});
+    }
+
+    async function saveCourse() {
+        const msg = document.getElementById('form-msg');
+        const normalized = normalizeCourse({
+            id: document.getElementById('form-id').value,
+            name: document.getElementById('form-name').value,
+            term: document.getElementById('form-term').value,
+            property: document.getElementById('form-property').value,
+            will_offer: document.getElementById('form-offer').value,
+            credit: document.getElementById('form-credit').value
+        });
+        if (normalized.error) {
+            msg.textContent = normalized.error;
+            return;
+        }
+        const button = document.getElementById('save-button');
+        button.disabled = true;
+        msg.textContent = '';
+        try {
+            const resp = await fetch(BASE_URL + (editingId === null ? '/create' : '/update'), {
+                method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify([normalized.course])
+            });
+            const result = await readResult(resp);
+            if (!result) return;
+            if (result.isSucceed) {
+                alert(result.string || '操作成功。');
+                resetForm();
+                await loadCourses();
+            } else {
+                msg.textContent = result.string || '操作失败。';
+            }
+        } catch (error) {
+            console.error('保存课程失败：', error);
+            msg.textContent = '请求失败，请重试。';
+        } finally {
+            button.disabled = false;
+        }
+    }
+
+    async function deleteCourse(id) {
+        if (!window.confirm(`确定删除课程 ${id} 吗？已有选课记录的课程不会被删除。`)) return;
+        const msg = document.getElementById('course-msg');
+        msg.textContent = '';
+        try {
+            const resp = await fetch(BASE_URL + '/delete', {
+                method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify([id])
+            });
+            const result = await readResult(resp);
+            if (!result) return;
+            if (result.isSucceed) {
+                if (editingId === id) resetForm();
+                await loadCourses();
+            }
+            msg.textContent = result.isSucceed ? '' : (result.string || '删除失败。');
+            if (result.isSucceed) alert(result.string || '删除成功。');
+        } catch (error) {
+            console.error('删除课程失败：', error);
+            msg.textContent = '请求失败，请重试。';
+        }
+    }
+
+    function updateCsvHint() {
+        const operation = document.getElementById('csv-operation').value;
+        document.getElementById('csv-hint').textContent = operation === 'delete'
+            ? '格式：id（首行表头可省略）'
+            : '格式：id,name,term,property,will_offer,credit（首行表头可省略，是否开课填1/0）';
+    }
+
+    function parseCsv(text) {
+        const rows = [];
+        text.split(/\r\n|\r|\n/).forEach((line, index) => {
+            if (line.trim()) rows.push({lineNumber: index + 1, cells: line.split(',').map(cell => cell.trim())});
+        });
+        if (rows.length && !/^\d+$/.test(rows[0].cells[0])) rows.shift();
+        return rows;
+    }
+
+    function renderPending() {
+        const pageSize = getPageSize('pending-page-size');
+        const pageCount = Math.max(1, Math.ceil(pendingRows.length / pageSize));
+        pendingPage = Math.min(pendingPage, pageCount);
+        const start = (pendingPage - 1) * pageSize;
+        const body = document.getElementById('pending-body');
+        body.replaceChildren();
+        pendingRows.slice(start, start + pageSize).forEach((entry, index) => {
+            const course = entry.course;
+            const row = document.createElement('tr');
+            addCell(row, start + index + 1);
+            addCell(row, OPERATION_NAMES[entry.operation]);
+            addCell(row, course.id);
+            addCell(row, entry.operation === 'delete' ? '—' : course.name);
+            addCell(row, entry.operation === 'delete' ? '—' : course.term);
+            addCell(row, entry.operation === 'delete' ? '—' : course.property);
+            addCell(row, entry.operation === 'delete' ? '—' : (course.will_offer ? '是' : '否'));
+            addCell(row, entry.operation === 'delete' ? '—' : course.credit);
+            const actions = addCell(row, '');
+            actions.textContent = '';
+            addActionButton(actions, '移除', () => {
+                pendingRows.splice(start + index, 1);
+                if (pendingRows.length === 0) releasePendingOperation();
+                renderPending();
+            });
+            body.appendChild(row);
+        });
+        document.getElementById('pending-count').textContent = pendingRows.length;
+        document.getElementById('pending-page-info').textContent = `第 ${pendingPage} / ${pageCount} 页（共 ${pendingRows.length} 条）`;
+        document.getElementById('pending-prev').disabled = pendingPage <= 1;
+        document.getElementById('pending-next').disabled = pendingPage >= pageCount;
+    }
+
+    function releasePendingOperation() {
+        pendingOperation = null;
+        document.getElementById('csv-operation').disabled = false;
+    }
+
+    function importCsv() {
+        const msg = document.getElementById('pending-msg');
+        const file = document.getElementById('csv-file').files[0];
+        if (!file) {
+            msg.textContent = '请先选择 CSV 文件。';
+            return;
+        }
+        const operation = document.getElementById('csv-operation').value;
+        const reader = new FileReader();
+        reader.onload = function () {
+            const errors = [];
+            const imported = [];
+            for (const row of parseCsv(String(reader.result))) {
+                let course;
+                if (operation === 'delete') {
+                    const result = normalizeId(row.cells[0]);
+                    if (result.error) {
+                        errors.push(`第${row.lineNumber}行：${result.error}`);
+                        continue;
+                    }
+                    course = {id: result.id};
+                } else {
+                    const result = normalizeCourse({
+                        id: row.cells[0], name: row.cells[1], term: row.cells[2], property: row.cells[3],
+                        will_offer: row.cells[4], credit: row.cells[5]
+                    });
+                    if (result.error) {
+                        errors.push(`第${row.lineNumber}行：${result.error}`);
+                        continue;
+                    }
+                    course = result.course;
+                }
+                if (imported.some(entry => entry.course.id === course.id)) {
+                    errors.push(`第${row.lineNumber}行：本文件内课程编号重复：${course.id}`);
+                    continue;
+                }
+                imported.push({operation, course});
+            }
+            pendingRows = imported;
+            pendingPage = 1;
+            pendingOperation = imported.length ? operation : null;
+            document.getElementById('csv-operation').disabled = imported.length > 0;
+            msg.textContent = errors.join('\n');
+            renderPending();
+        };
+        reader.onerror = function () { msg.textContent = '文件读取失败，请重试。'; };
+        reader.readAsText(file, 'UTF-8');
+    }
+
+    async function submitPending() {
+        const msg = document.getElementById('pending-msg');
+        if (!pendingRows.length || !pendingOperation) {
+            msg.textContent = '待提交列表为空。';
+            return;
+        }
+        const button = document.getElementById('submit-pending-button');
+        button.disabled = true;
+        msg.textContent = '';
+        const operation = pendingOperation;
+        try {
+            const body = operation === 'delete' ? pendingRows.map(entry => entry.course.id) : pendingRows.map(entry => entry.course);
+            const resp = await fetch(BASE_URL + '/' + operation, {
+                method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)
+            });
+            const result = await readResult(resp);
+            if (!result) return;
+            pendingRows = [];
+            releasePendingOperation();
+            renderPending();
+            document.getElementById('csv-file').value = '';
+            document.getElementById('csv-file-name').textContent = '未选择文件';
+            alert(result.string || '批量操作已完成。');
+            await loadCourses();
+        } catch (error) {
+            console.error('批量课程操作失败：', error);
+            msg.textContent = '请求失败，请重试。';
+        } finally {
+            button.disabled = false;
+        }
+    }
+
+    document.getElementById('query-button').addEventListener('click', () => { coursePage = 1; loadCourses(); });
+    document.getElementById('reset-query-button').addEventListener('click', () => {
+        ['query-id', 'query-name', 'query-term', 'query-property'].forEach(id => document.getElementById(id).value = '');
+        document.getElementById('query-offer').value = '';
+        coursePage = 1;
+        loadCourses();
+    });
+    document.getElementById('course-page-size').addEventListener('change', () => { coursePage = 1; renderCourses(); });
+    document.getElementById('course-prev').addEventListener('click', () => { if (coursePage > 1) { coursePage--; renderCourses(); } });
+    document.getElementById('course-next').addEventListener('click', () => { coursePage++; renderCourses(); });
+    document.getElementById('save-button').addEventListener('click', saveCourse);
+    document.getElementById('cancel-edit-button').addEventListener('click', resetForm);
+    document.getElementById('csv-file').addEventListener('change', function () {
+        document.getElementById('csv-file-name').textContent = this.files.length ? this.files[0].name : '未选择文件';
+    });
+    document.getElementById('csv-operation').addEventListener('change', updateCsvHint);
+    document.getElementById('csv-import-button').addEventListener('click', importCsv);
+    document.getElementById('submit-pending-button').addEventListener('click', submitPending);
+    document.getElementById('pending-page-size').addEventListener('change', () => { pendingPage = 1; renderPending(); });
+    document.getElementById('pending-prev').addEventListener('click', () => { if (pendingPage > 1) { pendingPage--; renderPending(); } });
+    document.getElementById('pending-next').addEventListener('click', () => { pendingPage++; renderPending(); });
+
+    updateCsvHint();
+    resetForm();
+    renderPending();
+    loadCourses();
+</script>
+</body>
+</html>
