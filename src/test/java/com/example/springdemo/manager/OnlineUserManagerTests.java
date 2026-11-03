@@ -127,6 +127,15 @@ class OnlineUserManagerTests {
     }
 
     @Test
+    void logoutByIdRemovesAllSessionData() {
+        when(hashOperations.get(SESSION_USERS_KEY, SESSION_ID)).thenReturn(USER_ID);
+
+        onlineUserManager.logoutById(SESSION_ID);
+
+        verifySessionRemoved();
+    }
+
+    @Test
     void statisticsIgnoreAndRemoveExpiredSessions() {
         String expiredSessionId = "session-2";
         when(hashOperations.keys(SESSION_USERS_KEY)).thenReturn(Set.of(SESSION_ID, expiredSessionId));

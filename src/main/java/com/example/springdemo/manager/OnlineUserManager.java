@@ -153,6 +153,11 @@ public class OnlineUserManager {
         removeSession(httpSession.getId());
     }
 
+    /** Spring Session 删除或过期时清理对应的在线状态 */
+    public void logoutById(@NonNull String sessionId) {
+        removeSession(sessionId);
+    }
+
     /** 获取已登录会话数量（注意同一个用户可以在多个会话中登录） */
     public int getOnlineSessionCount() {
         return getActiveSessionIds().size();

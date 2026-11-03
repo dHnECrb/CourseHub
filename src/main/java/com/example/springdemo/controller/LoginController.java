@@ -28,6 +28,9 @@ public class LoginController {
     @Resource
     private UserLoginService userLoginService;
 
+    @Resource
+    private LoginCounter loginCounter;
+
     public LoginController(UserLoginService userLoginService) {
         this.userLoginService = userLoginService;
     }
@@ -57,7 +60,7 @@ public class LoginController {
 //            System.out.println("第"+loginCount+"个人次登录");
             modelAndView.addObject("msg",
                     msgSource.getMessage("responseMessage.loginCount",
-                            new Object[]{Integer.toString(LoginCounter.getTotalCount())},
+                            new Object[]{Long.toString(loginCounter.getTotalCount())},
                             locale));
             return modelAndView;
         }

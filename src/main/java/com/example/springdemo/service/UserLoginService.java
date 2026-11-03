@@ -28,6 +28,9 @@ public class UserLoginService {
     @Resource
     private OnlineUserManager onlineUserManager;
 
+    @Resource
+    private LoginCounter loginCounter;
+
     public UserLoginService(UserPasswordMapper userPasswordMapper) {
         this.userPasswordMapper = userPasswordMapper;
     }
@@ -120,13 +123,13 @@ public class UserLoginService {
                     result=true;
                     String position=userPassword.getPosition();
                     if(position.equals(UserPosition.TEACHER.getString())){
-                        LoginCounter.TEACHER.increment();
+                        loginCounter.increment(UserPosition.TEACHER);
                         userPosition= UserPosition.TEACHER;
                     } else if (position.equals(UserPosition.STUDENT.getString())) {
-                        LoginCounter.STUDENT.increment();
+                        loginCounter.increment(UserPosition.STUDENT);
                         userPosition= UserPosition.STUDENT;
                     } else if (position.equals(UserPosition.ADMIN.getString())) {
-                        LoginCounter.ADMIN.increment();
+                        loginCounter.increment(UserPosition.ADMIN);
                         userPosition= UserPosition.ADMIN;
                     }
                     else{

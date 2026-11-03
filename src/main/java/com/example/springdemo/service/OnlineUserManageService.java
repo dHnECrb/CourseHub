@@ -6,6 +6,7 @@ import com.example.springdemo.dto.OnlineUserView;
 import com.example.springdemo.dto.RequestResult;
 import com.example.springdemo.entity.User;
 import com.example.springdemo.entity.UserPosition;
+import com.example.springdemo.manager.LoginCounter;
 import com.example.springdemo.manager.OnlineUserManager;
 import com.example.springdemo.mapper.UserMapper;
 import jakarta.annotation.Resource;
@@ -29,6 +30,9 @@ public class OnlineUserManageService {
 
     @Resource
     private OnlineUserManager onlineUserManager;
+
+    @Resource
+    private LoginCounter loginCounter;
 
     @Resource
     private UserMapper userMapper;
@@ -57,13 +61,16 @@ public class OnlineUserManageService {
         return new RequestResult(true, 200, null);
     }
 
-    /**获取在线用户数量与在线会话数量，无权限时返回 null*/
+    /**获取在线用户数量、在线会话数量与各角色累计登录次数，无权限时返回 null*/
     public OnlineCountsView getCounts(@NonNull HttpSession httpSession){
         if(!isAdmin(httpSession)){
             return null;
         }
         return new OnlineCountsView(onlineUserManager.getOnlineUserCount(),
-                onlineUserManager.getOnlineSessionCount());
+                onlineUserManager.getOnlineSessionCount(),
+                loginCounter.getCount(UserPosition.ADMIN),
+                loginCounter.getCount(UserPosition.STUDENT),
+                loginCounter.getCount(UserPosition.TEACHER));
     }
 
     /**获取当前的在线用户数量上限与单用户会话数量上限，无权限时返回 null*/

@@ -1,5 +1,6 @@
 package com.example.springdemo;
 
+import com.example.springdemo.entity.UserPosition;
 import com.example.springdemo.mapper.UserMapper;
 import com.example.springdemo.manager.LoginCounter;
 import jakarta.annotation.Resource;
@@ -19,6 +20,9 @@ public class SpringDemoApplication {
 
     @Resource
     private UserMapper userMapper;
+
+    @Resource
+    private LoginCounter loginCounter;
 
     public static void main(String[] args) {
         SpringApplication.run(SpringDemoApplication.class, args);
@@ -50,7 +54,8 @@ public class SpringDemoApplication {
 
     @GetMapping("/get")
     public String f2(){
-        return "Get api without params.\nteacher: "+ LoginCounter.TEACHER.getCount()+"; student: "+ LoginCounter.STUDENT.getCount();
+        return "Get api without params.\nteacher: "+ loginCounter.getCount(UserPosition.TEACHER)
+                +"; student: "+ loginCounter.getCount(UserPosition.STUDENT);
     }
 
     @GetMapping("/get/{id}")
