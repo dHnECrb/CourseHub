@@ -29,4 +29,13 @@ public enum UserPosition {
         }
         throw new IllegalArgumentException("错误的代码。:"+code);
     }
+
+    public static boolean isValidPosition(String position){
+        for(UserPosition userPosition : UserPosition.values()){
+            if(userPosition.string.equals(position)){
+                return true;
+            }
+        }
+        return false;
+    }
 }

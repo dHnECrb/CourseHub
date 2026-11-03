@@ -78,7 +78,7 @@ public class UserManageService {
         for (CreatedUserView user : users) {
             Long id = user.getId();
             if (id == null || seenIds.contains(id) || userMapper.selectById(id) != null
-                    || userPasswordMapper.selectById(id) != null) {
+                    || userPasswordMapper.selectById(id) != null || !UserPosition.isValidPosition(user.getPosition())) {
                 failedIds.add(id == null ? "(空)" : id.toString());
                 continue;
             }
