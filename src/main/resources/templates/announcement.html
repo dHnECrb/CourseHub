@@ -41,7 +41,7 @@
         <article class="card announcement-item" th:each="item : ${announcements}">
             <h2 class="announcement-title" th:text="${item.title}"></h2>
             <p class="announcement-meta"
-               th:text="|发布时间：${#temporals.format(item.publish_time, 'yyyy-MM-dd HH:mm')}　发布者：${item.publisher_id}|"></p>
+               th:text="|发布时间：${#temporals.format(item.publish_time, 'yyyy-MM-dd HH:mm')}　发布者：${item.publisher_name}|"></p>
             <div class="announcement-text" th:text="${item.content}"></div>
         </article>
     </div>

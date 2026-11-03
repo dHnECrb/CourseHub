@@ -1,11 +1,14 @@
 package com.example.springdemo.service;
 
+import com.example.springdemo.dto.AnnouncementView;
 import com.example.springdemo.dto.RequestResult;
 import com.example.springdemo.entity.Announcement;
 import com.example.springdemo.entity.AnnouncementRead;
+import com.example.springdemo.entity.User;
 import com.example.springdemo.entity.UserPosition;
 import com.example.springdemo.mapper.AnnouncementMapper;
 import com.example.springdemo.mapper.AnnouncementReadMapper;
+import com.example.springdemo.mapper.UserMapper;
 import jakarta.servlet.http.HttpSession;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -46,6 +49,9 @@ class AnnouncementServiceTests {
 
     @Mock
     private AnnouncementReadMapper announcementReadMapper;
+
+    @Mock
+    private UserMapper userMapper;
 
     @Mock
     private HttpSession httpSession;
@@ -153,12 +159,41 @@ class AnnouncementServiceTests {
     }
 
     @Test
-    void returnsAllAnnouncementsWithoutChangingDismissalState() {
-        List<Announcement> announcements = List.of(announcement(9L), announcement(8L));
+    void returnsAllAnnouncementsWithPublisherNames() {
+        List<Announcement> announcements = List.of(
+                announcement(9L),
+                new Announcement(8L, "标题", "正文", 2L, LocalDateTime.of(2026, 11, 1, 10, 0)),
+                announcement(7L));
         when(announcementMapper.selectList(any())).thenReturn(announcements);
+        when(userMapper.selectBatchIds(List.of(1L, 2L))).thenReturn(List.of(
+                new User(2L, "管理员乙", 30, "b@example.com"),
+                new User(1L, "管理员甲", 30, "a@example.com")));
 
-        assertSame(announcements, announcementService.getAllAnnouncements());
+        List<AnnouncementView> views = announcementService.getAllAnnouncements();
+
+        assertEquals(3, views.size());
+        assertEquals("管理员甲", views.get(0).getPublisher_name());
+        assertEquals("管理员乙", views.get(1).getPublisher_name());
+        assertEquals("管理员甲", views.get(2).getPublisher_name());
         verifyNoInteractions(announcementReadMapper);
+    }
+
+    @Test
+    void showsUnknownPublisherWhenUserDoesNotExist() {
+        when(announcementMapper.selectList(any())).thenReturn(List.of(announcement(8L)));
+        when(userMapper.selectBatchIds(List.of(1L))).thenReturn(List.of());
+
+        List<AnnouncementView> views = announcementService.getAllAnnouncements();
+
+        assertEquals("未知用户", views.get(0).getPublisher_name());
+    }
+
+    @Test
+    void doesNotQueryUsersWhenNoAnnouncementExists() {
+        when(announcementMapper.selectList(any())).thenReturn(List.of());
+
+        assertTrue(announcementService.getAllAnnouncements().isEmpty());
+        verifyNoInteractions(userMapper, announcementReadMapper);
     }
 
     @Test

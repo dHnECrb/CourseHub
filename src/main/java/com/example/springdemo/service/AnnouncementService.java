@@ -1,12 +1,15 @@
 package com.example.springdemo.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.example.springdemo.dto.AnnouncementView;
 import com.example.springdemo.dto.RequestResult;
 import com.example.springdemo.entity.Announcement;
 import com.example.springdemo.entity.AnnouncementRead;
+import com.example.springdemo.entity.User;
 import com.example.springdemo.entity.UserPosition;
 import com.example.springdemo.mapper.AnnouncementMapper;
 import com.example.springdemo.mapper.AnnouncementReadMapper;
+import com.example.springdemo.mapper.UserMapper;
 import com.example.springdemo.util.BasicFunctions;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpSession;
@@ -18,6 +21,8 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 public class AnnouncementService {
@@ -32,6 +37,9 @@ public class AnnouncementService {
 
     @Resource
     private AnnouncementReadMapper announcementReadMapper;
+
+    @Resource
+    private UserMapper userMapper;
 
     private boolean isAdmin(@NonNull HttpSession httpSession) {
         Object position = httpSession.getAttribute("userPosition");
@@ -73,12 +81,29 @@ public class AnnouncementService {
         return announcement;
     }
 
-    /**查询全部历史公告，不改变用户的提示设置。*/
-    public List<Announcement> getAllAnnouncements() {
+    /**查询全部历史公告并批量补充发布者姓名，不改变用户的提示设置。*/
+    public List<AnnouncementView> getAllAnnouncements() {
         LambdaQueryWrapper<Announcement> wrapper = new LambdaQueryWrapper<>();
         wrapper.orderByDesc(Announcement::getPublish_time)
                 .orderByDesc(Announcement::getId);
-        return announcementMapper.selectList(wrapper);
+        List<Announcement> announcements = announcementMapper.selectList(wrapper);
+        if (announcements.isEmpty()) {
+            return List.of();
+        }
+
+        List<Long> publisherIds = announcements.stream()
+                .map(Announcement::getPublisher_id)
+                .distinct()
+                .toList();
+        Map<Long, String> nameById = userMapper.selectBatchIds(publisherIds).stream()
+                .collect(Collectors.toMap(User::getId, User::getName));
+        return announcements.stream()
+                .map(announcement -> new AnnouncementView(
+                        announcement.getTitle(),
+                        announcement.getContent(),
+                        nameById.getOrDefault(announcement.getPublisher_id(), "未知用户"),
+                        announcement.getPublish_time()))
+                .toList();
     }
 
     /**发布一条新公告，历史公告及用户的不再提示记录均保留。*/
