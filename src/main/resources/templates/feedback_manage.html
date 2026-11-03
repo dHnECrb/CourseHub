@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>意见反馈管理</title>
+    <link rel="icon" th:href="@{/favicon.ico}" type="image/x-icon">
+    <link th:href="@{/select_course_style.css}" rel="stylesheet" type="text/css">
+    <link th:href="@{/idle_mask.css}" rel="stylesheet" type="text/css">
+    <style>
+        .main{max-width:1440px;margin:0 auto;padding:60px 18px 50px}
+        .filter-form{display:flex;align-items:end;gap:12px;flex-wrap:wrap;padding:18px;border-bottom:1px solid var(--line);background:#f8fafc;font-size:14px}
+        .filter-field{display:flex;flex-direction:column;gap:6px}
+        .filter-field input,.filter-field select{padding:7px 9px;border:1px solid #94a3b8;border-radius:6px;background:#fff;font:inherit}
+        .filter-form button,.export-link,.action-button{padding:7px 18px;border:1px solid #64748b;border-radius:8px;background:#fff;color:inherit;text-decoration:none;cursor:pointer;font:inherit}
+        .filter-form button:hover,.export-link:hover,.action-button:hover{background:#f1f5f9}
+        .table-wrap{overflow-x:auto}
+        table{min-width:1280px}
+        .content-cell{min-width:260px;max-width:420px;white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.6}
+        .time-cell{white-space:nowrap;font-size:13px}
+        .action-button{padding:4px 10px;font-size:13px;white-space:nowrap}
+        .action-button:disabled{opacity:.5;cursor:not-allowed}
+        .empty{padding:42px 20px;text-align:center;color:var(--muted)}
+        .hint{padding:12px 18px;color:var(--muted);font-size:13px}
+    </style>
+</head>
+<body>
+<button id="back-button" type="button" onclick="history.back()">← 返回上一级</button>
+
+<div id="idle-mask" style="display:none;">
+    <div id="idle-dialog" role="alertdialog" aria-modal="true">
+        <div id="idle-title">会话即将过期</div>
+        <div id="idle-message">检测到您长时间未操作，<span id="idle-countdown">30</span> 秒后将自动退出登录。</div>
+        <div id="idle-buttons">
+            <button id="idle-stay" class="btn btn-primary">继续会话</button>
+            <button id="idle-logout" class="btn btn-secondary">退出登录</button>
+        </div>
+    </div>
+</div>
+
+<main class="main">
+    <section class="card">
+        <div class="card-title">意见反馈管理</div>
+        <form class="filter-form" method="get" th:action="@{/admin/feedback_manage}">
+            <div class="filter-field">
+                <label for="start-date">开始日期</label>
+                <input type="date" id="start-date" name="startDate" th:value="${startDate}">
+            </div>
+            <div class="filter-field">
+                <label for="end-date">结束日期</label>
+                <input type="date" id="end-date" name="endDate" th:value="${endDate}">
+            </div>
+            <div class="filter-field">
+                <label for="read-status">已读状态</label>
+                <select id="read-status" name="readStatus">
+                    <option value="all" th:selected="${readStatus == 'all'}">全部</option>
+                    <option value="unread" th:selected="${readStatus == 'unread'}">未读</option>
+                    <option value="read" th:selected="${readStatus == 'read'}">已读</option>
+                </select>
+            </div>
+            <div class="filter-field">
+                <label for="delete-status">删除状态</label>
+                <select id="delete-status" name="deleteStatus">
+                    <option value="all" th:selected="${deleteStatus == 'all'}">全部</option>
+                    <option value="not_deleted" th:selected="${deleteStatus == 'not_deleted'}">未删除</option>
+                    <option value="deleted" th:selected="${deleteStatus == 'deleted'}">已删除</option>
+                </select>
+            </div>
+            <button type="submit">筛选</button>
+            <a class="export-link" th:href="@{/admin/feedback_manage}">恢复默认</a>
+            <a class="export-link" th:href="@{/admin/feedback_manage/export(startDate=${startDate},endDate=${endDate},readStatus=${readStatus},deleteStatus=${deleteStatus})}">导出当前结果</a>
+        </form>
+        <div class="hint">默认显示所有时间、未读、未删除的意见；结果按提交时间倒序排列。</div>
+        <div class="table-wrap" th:if="${!feedbackList.isEmpty()}">
+            <table>
+                <thead>
+                <tr>
+                    <th>意见编号</th><th>用户ID</th><th>用户姓名</th><th>反馈正文</th><th>提交时间</th>
+                    <th>已读状态</th><th>已读时间</th><th>删除状态</th><th>删除时间</th><th>操作</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="item : ${feedbackList}">
+                    <td th:text="${item.id}"></td>
+                    <td th:text="${item.user_id}"></td>
+                    <td th:text="${item.user_name}"></td>
+                    <td class="content-cell" th:text="${item.content}"></td>
+                    <td class="time-cell" th:text="${#temporals.format(item.submit_time, 'yyyy-MM-dd HH:mm:ss')}"></td>
+                    <td th:text="${item.is_read} ? '已读' : '未读'"></td>
+                    <td class="time-cell" th:text="${item.read_time == null ? '—' : #temporals.format(item.read_time, 'yyyy-MM-dd HH:mm:ss')}"></td>
+                    <td th:text="${item.is_deleted} ? '已删除' : '未删除'"></td>
+                    <td class="time-cell" th:text="${item.delete_time == null ? '—' : #temporals.format(item.delete_time, 'yyyy-MM-dd HH:mm:ss')}"></td>
+                    <td>
+                        <button type="button" class="action-button read-button"
+                                th:attr="data-feedback-id=${item.id},data-read=${!item.is_read}"
+                                th:text="${item.is_read} ? '标为未读' : '标为已读'"></button>
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="empty" th:if="${feedbackList.isEmpty()}">没有符合当前筛选条件的意见反馈</div>
+    </section>
+</main>
+
+<script th:src="@{/heartbeat.js}"></script>
+<script>
+    document.querySelectorAll('.read-button').forEach(button => {
+        button.addEventListener('click', async () => {
+            button.disabled = true;
+            try {
+                const resp = await fetch('/app_1/admin/feedback_manage/read', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                    body: new URLSearchParams({
+                        feedbackId: button.dataset.feedbackId,
+                        read: button.dataset.read
+                    })
+                });
+                if (resp.status === 401) {
+                    alert('登录已过期，请重新登录。');
+                    window.location.href = '/app_1/login';
+                    return;
+                }
+                const result = await resp.json();
+                if (!resp.ok || !result.isSucceed) {
+                    alert(result.string || '修改失败，请重试。');
+                    button.disabled = false;
+                    return;
+                }
+                window.location.reload();
+            } catch (err) {
+                console.error('修改已读状态失败：', err);
+                alert('请求失败，请重试。');
+                button.disabled = false;
+            }
+        });
+    });
+</script>
+</body>
+</html>

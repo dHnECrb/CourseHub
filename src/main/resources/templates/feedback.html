@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>意见反馈</title>
+    <link rel="icon" th:href="@{/favicon.ico}" type="image/x-icon">
+    <link th:href="@{/select_course_style.css}" rel="stylesheet" type="text/css">
+    <link th:href="@{/idle_mask.css}" rel="stylesheet" type="text/css">
+    <style>
+        .main{max-width:960px;margin:0 auto;padding:60px 18px 50px}
+        .feedback-form{padding:22px}
+        .feedback-form label{display:block;margin-bottom:8px;font-weight:600}
+        .feedback-form textarea{width:100%;min-height:150px;padding:10px 12px;border:1px solid #94a3b8;border-radius:6px;font:inherit;line-height:1.7;resize:vertical;background:#fff}
+        .form-actions{display:flex;align-items:center;gap:14px;margin-top:14px;flex-wrap:wrap}
+        .form-actions button,.action-button{padding:7px 22px;border:1px solid #64748b;border-radius:8px;background:#fff;cursor:pointer}
+        .form-actions button:hover,.action-button:hover{background:#f1f5f9}
+        button:disabled{opacity:.5;cursor:not-allowed}
+        .hint{color:var(--muted);font-size:13px}
+        .message{color:#b91c1c;font-size:14px;min-height:18px}
+        .feedback-list{display:grid;gap:18px;margin-top:26px}
+        .feedback-item{padding:20px 24px}
+        .feedback-meta{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:12px;color:var(--muted);font-size:13px}
+        .read-status{font-weight:600;color:#a16207}
+        .read-status.read{color:#15803d}
+        .feedback-content{line-height:1.8;white-space:pre-wrap;overflow-wrap:anywhere}
+        .feedback-actions{margin-top:14px;text-align:right}
+        .action-button{padding:4px 14px;font-size:13px}
+        .empty{padding:42px 20px;color:var(--muted);text-align:center}
+    </style>
+</head>
+<body>
+<button id="back-button" type="button" onclick="history.back()">← 返回上一级</button>
+
+<div id="idle-mask" style="display:none;">
+    <div id="idle-dialog" role="alertdialog" aria-modal="true">
+        <div id="idle-title">会话即将过期</div>
+        <div id="idle-message">检测到您长时间未操作，<span id="idle-countdown">30</span> 秒后将自动退出登录。</div>
+        <div id="idle-buttons">
+            <button id="idle-stay" class="btn btn-primary">继续会话</button>
+            <button id="idle-logout" class="btn btn-secondary">退出登录</button>
+        </div>
+    </div>
+</div>
+
+<main class="main">
+    <section class="card">
+        <div class="card-title">提交意见反馈</div>
+        <form id="feedback-form" class="feedback-form">
+            <label for="feedback-content">反馈正文（最多 800 字，每天最多提交一次）</label>
+            <textarea id="feedback-content" maxlength="800" required placeholder="请输入您的意见或建议"></textarea>
+            <div class="form-actions">
+                <button type="submit" id="submit-button">提交意见</button>
+                <span class="hint"><span id="content-length">0</span>/800</span>
+                <span id="submit-message" class="message" role="alert"></span>
+            </div>
+        </form>
+    </section>
+
+    <div class="feedback-list" th:if="${!feedbackList.isEmpty()}">
+        <article class="card feedback-item" th:each="item : ${feedbackList}">
+            <div class="feedback-meta">
+                <span th:text="|提交时间：${#temporals.format(item.submit_time, 'yyyy-MM-dd HH:mm:ss')}|"></span>
+                <span class="read-status" th:classappend="${item.is_read} ? ' read' : ''"
+                      th:text="${item.is_read} ? '管理员已读' : '管理员未读'"></span>
+            </div>
+            <div class="feedback-content" th:text="${item.content}"></div>
+            <div class="feedback-actions">
+                <button type="button" class="action-button delete-button" th:attr="data-feedback-id=${item.id}">删除</button>
+            </div>
+        </article>
+    </div>
+    <section class="card empty" th:if="${feedbackList.isEmpty()}">暂无意见反馈</section>
+</main>
+
+<script th:src="@{/heartbeat.js}"></script>
+<script>
+    const contentInput = document.getElementById('feedback-content');
+    const submitButton = document.getElementById('submit-button');
+    const submitMessage = document.getElementById('submit-message');
+
+    contentInput.addEventListener('input', () => {
+        document.getElementById('content-length').textContent = contentInput.value.length;
+    });
+
+    async function readResponse(resp) {
+        if (resp.status === 401) {
+            alert('登录已过期，请重新登录。');
+            window.location.href = '/app_1/login';
+            return null;
+        }
+        const result = await resp.json();
+        if (!resp.ok || !result.isSucceed) {
+            throw new Error(result.string || '操作失败，请重试。');
+        }
+        return result;
+    }
+
+    document.getElementById('feedback-form').addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const content = contentInput.value.trim();
+        if (!content) {
+            submitMessage.textContent = '反馈正文不能为空。';
+            return;
+        }
+        submitButton.disabled = true;
+        submitMessage.textContent = '';
+        try {
+            const resp = await fetch('/app_1/feedback/submit', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                body: new URLSearchParams({content: content})
+            });
+            const result = await readResponse(resp);
+            if (result) {
+                window.location.reload();
+            }
+        } catch (err) {
+            submitMessage.textContent = err.message || '请求失败，请重试。';
+        } finally {
+            submitButton.disabled = false;
+        }
+    });
+
+    document.querySelectorAll('.delete-button').forEach(button => {
+        button.addEventListener('click', async () => {
+            if (!window.confirm('确定删除这条意见反馈吗？删除后，当天依然不能提交反馈！')) {
+                return;
+            }
+            button.disabled = true;
+            try {
+                const resp = await fetch('/app_1/feedback/delete', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                    body: new URLSearchParams({feedbackId: button.dataset.feedbackId})
+                });
+                const result = await readResponse(resp);
+                if (result) {
+                    window.location.reload();
+                }
+            } catch (err) {
+                alert(err.message || '删除失败，请重试。');
+                button.disabled = false;
+            }
+        });
+    });
+</script>
+</body>
+</html>
