@@ -14,6 +14,7 @@
             display:flex;
             justify-content:center;
             gap:40px;
+            flex-wrap:wrap;
             padding:22px 18px;
         }
         .stat-box{
@@ -97,6 +98,18 @@
                 <div class="stat-label">在线用户数量</div>
                 <div class="stat-value" id="online-user-count">—</div>
             </div>
+            <div class="stat-box">
+                <div class="stat-label">管理员登录次数</div>
+                <div class="stat-value" id="admin-login-count">—</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">学生登录次数</div>
+                <div class="stat-value" id="student-login-count">—</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">教师登录次数</div>
+                <div class="stat-value" id="teacher-login-count">—</div>
+            </div>
         </div>
     </section>
 
@@ -163,6 +176,9 @@
             if (!counts) return;
             document.getElementById('online-user-count').textContent = counts.onlineUserCount;
             document.getElementById('online-session-count').textContent = counts.onlineSessionCount;
+            document.getElementById('admin-login-count').textContent = counts.adminLoginCount;
+            document.getElementById('student-login-count').textContent = counts.studentLoginCount;
+            document.getElementById('teacher-login-count').textContent = counts.teacherLoginCount;
         } catch (err) {
             console.error('在线数量加载失败：', err);
         }
